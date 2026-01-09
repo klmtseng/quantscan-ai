@@ -14,8 +14,10 @@ import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
 const App: React.FC = () => {
   // Papers state now holds the fetched data
   const [papers, setPapers] = useState<ResearchPaper[]>([]);
-  const [activeTopic, setActiveTopic] = useState<ResearchTopic>('All');
-  const [selectedSources, setSelectedSources] = useState<string[]>([]); // Default empty means "All"
+  // Default to 'QuantFinance' as requested
+  const [activeTopic, setActiveTopic] = useState<ResearchTopic>('QuantFinance');
+  // Initialize with ALL sources selected so they appear "pressed down" by default
+  const [selectedSources, setSelectedSources] = useState<string[]>(DATA_SOURCES.map(s => s.id));
   // Default to 'Month'
   const [datePreset, setDatePreset] = useState<DateFilterPreset>('Month');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
@@ -404,7 +406,7 @@ const App: React.FC = () => {
                 onClick={() => {
                   setDatePreset('Year');
                   handleTopicChange('All');
-                  setSelectedSources([]);
+                  setSelectedSources(DATA_SOURCES.map(d => d.id));
                   setSearchTerm('');
                   setSortBy('relevance');
                 }}

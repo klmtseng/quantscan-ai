@@ -190,6 +190,7 @@ export class PaperService {
     let baseQuery = "";
     switch(topic) {
         case 'All': baseQuery = ""; break;
+        case 'QuantFinance': baseQuery = "quantitative finance empirical asset pricing"; break;
         case 'Momentum': baseQuery = "momentum strategy asset pricing"; break;
         case 'Crypto': baseQuery = "cryptocurrency bitcoin defi"; break;
         case 'ML': baseQuery = "machine learning finance neural networks"; break;
