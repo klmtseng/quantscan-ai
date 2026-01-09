@@ -1,6 +1,55 @@
 
 import { ResearchPaper } from "../types";
 
+// Helper to generate smart tags based on content
+const generateTags = (title: string, abstract: string): string[] => {
+  const text = (title + " " + abstract).toLowerCase();
+  const tags = new Set<string>();
+
+  // Asset Classes & Markets
+  if (text.includes('crypto') || text.includes('bitcoin') || text.includes('ether') || text.includes('blockchain') || text.includes('defi')) tags.add('Crypto');
+  if (text.includes('equity') || text.includes('stock') || text.includes('equities')) tags.add('Equities');
+  if (text.includes('bond') || text.includes('fixed income') || text.includes('treasur') || text.includes('yield curve')) tags.add('Fixed Income');
+  if (text.includes('option') || text.includes('derivative') || text.includes('volatility') || text.includes('implied vol') || text.includes('hedging')) tags.add('Derivatives');
+  if (text.includes('fx') || text.includes('currency') || text.includes('exchange rate')) tags.add('FX');
+  if (text.includes('commodit')) tags.add('Commodities');
+  if (text.includes('etf')) tags.add('ETF');
+
+  // Strategies & Concepts
+  if (text.includes('momentum') || text.includes('trend')) tags.add('Momentum');
+  if (text.includes('reversal') || text.includes('mean reversion')) tags.add('Reversal');
+  if (text.includes('arbitrage')) tags.add('Arbitrage');
+  if (text.includes('value') && (text.includes('growth') || text.includes('investing'))) tags.add('Value');
+  if (text.includes('carry')) tags.add('Carry');
+  
+  // Methodology & Technology
+  if (text.includes('machine learning') || text.includes('neural network') || text.includes('deep learning') || text.includes('reinforcement learning') || text.includes('lstm') || text.includes('transformer')) tags.add('ML/AI');
+  if (text.includes('nlp') || text.includes('sentiment') || text.includes('textual') || text.includes('llm') || text.includes('language model')) tags.add('NLP');
+  if (text.includes('high frequency') || text.includes('hft') || text.includes('microstructure') || text.includes('order book') || text.includes('limit order')) tags.add('HFT');
+  if (text.includes('statistical') || text.includes('econometric')) tags.add('Stats');
+
+  // Core Topics
+  if (text.includes('risk') || text.includes('drawdown') || text.includes('var') || text.includes('shortfall')) tags.add('Risk Mgmt');
+  if (text.includes('portfolio') || text.includes('allocation') || text.includes('optimization')) tags.add('Portfolio');
+  if (text.includes('liquidity') && !tags.has('HFT')) tags.add('Liquidity');
+  if (text.includes('factor') || text.includes('alpha') || text.includes('asset pricing') || text.includes('beta')) tags.add('Asset Pricing');
+  if (text.includes('macro') || text.includes('inflation') || text.includes('monetary') || text.includes('gdp')) tags.add('Macro');
+  if (text.includes('esg') || text.includes('sustainable') || text.includes('climate')) tags.add('ESG');
+
+  // Tax & Corporate (Specific to user requirements seen in topics)
+  if (text.includes('tax') || text.includes('beps')) tags.add('Tax');
+  if (text.includes('transfer pricing')) tags.add('Transfer Pricing');
+  if (text.includes('supply chain') || text.includes('value chain')) tags.add('Value Chain');
+
+  // Default fallback if really nothing matches
+  if (tags.size === 0) {
+    if (text.includes('quant')) tags.add('Quant');
+    else tags.add('Finance');
+  }
+
+  return Array.from(tags);
+};
+
 // Helper to parse XML from arXiv
 const parseArxivXML = (text: string): ResearchPaper[] => {
   const parser = new DOMParser();
@@ -17,6 +66,9 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
     );
     const link = entry.getElementsByTagName("id")[0]?.textContent || ""; // arXiv ID url is usually the ID
 
+    const tags = generateTags(title, summary);
+    if (tags.length === 0) tags.push("Pre-print");
+
     return {
       id,
       title,
@@ -25,8 +77,8 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
       date: published.split("T")[0],
       source: "arXiv (q-fin)",
       url: link,
-      tags: ["Quantitative Finance", "Pre-print"],
-      relevanceScore: 100 // Default for direct search hits
+      tags: tags,
+      relevanceScore: 100
     };
   });
 };
@@ -52,10 +104,6 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
     ];
     if (junkTerms.some(term => titleLower.includes(term))) return false;
 
-    // 4. Relaxed Abstract check:
-    // Previously we returned false here, but SSRN/recent papers often lack this index.
-    // We now allow them but provide a placeholder in the map function.
-    
     return true;
   });
 
@@ -77,6 +125,9 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
       ? createAbstractFromInvertedIndex(work.abstract_inverted_index)
       : "Abstract preview not available via API. Please click 'Full Report' to view details at the source.";
 
+    const tags = generateTags(work.title, abstract);
+    if (tags.length === 0) tags.push("Research");
+
     return {
       id: work.id,
       title: work.title,
@@ -85,7 +136,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
       date: work.publication_date || "",
       source: sourceName || "OpenAlex",
       url: work.doi || work.primary_location?.landing_page_url || "",
-      tags: [work.type.replace('_', ' '), "Research"],
+      tags: tags,
       relevanceScore: 90
     };
   });
