@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import Fuse from 'fuse.js';
 import Header from './components/Header';
 import PaperCard from './components/PaperCard';
+import PaperListItem from './components/PaperListItem';
 import ContactModal from './components/ContactModal';
 // Switched from geminiService to paperService
 import { paperService } from './services/paperService';
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   // Default to 'Month'
   const [datePreset, setDatePreset] = useState<DateFilterPreset>('Month');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [customRange, setCustomRange] = useState<DateRange>({
@@ -260,40 +262,71 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Sort By</h3>
-                  <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-fit overflow-hidden">
-                    {/* Relevance Button */}
-                    <button
-                      onClick={() => setSortBy('relevance')}
-                      className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
-                        ${sortBy === 'relevance' 
-                          ? 'bg-slate-900 dark:bg-blue-600 text-white' 
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                        }`}
-                    >
-                      <i className="fas fa-fire"></i>
-                      Relevance
-                    </button>
+                <div className="flex gap-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Sort By</h3>
+                    <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-fit overflow-hidden">
+                      {/* Relevance Button */}
+                      <button
+                        onClick={() => setSortBy('relevance')}
+                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
+                          ${sortBy === 'relevance' 
+                            ? 'bg-slate-900 dark:bg-blue-600 text-white' 
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                      >
+                        <i className="fas fa-fire"></i>
+                        Relevance
+                      </button>
 
-                    {/* Unified Date Toggle Button */}
-                    <button
-                      onClick={handleDateSortToggle}
-                      className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
-                        ${(sortBy === 'newest' || sortBy === 'oldest') 
-                          ? 'bg-slate-900 dark:bg-blue-600 text-white' 
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                        }`}
-                    >
-                      {sortBy === 'oldest' ? (
-                        <i className="fas fa-sort-amount-up"></i>
-                      ) : (
-                        <i className="fas fa-sort-amount-down"></i>
-                      )}
-                      Date {sortBy === 'oldest' ? '(Oldest First)' : '(Newest First)'}
-                    </button>
+                      {/* Unified Date Toggle Button */}
+                      <button
+                        onClick={handleDateSortToggle}
+                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
+                          ${(sortBy === 'newest' || sortBy === 'oldest') 
+                            ? 'bg-slate-900 dark:bg-blue-600 text-white' 
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                      >
+                        {sortBy === 'oldest' ? (
+                          <i className="fas fa-sort-amount-up"></i>
+                        ) : (
+                          <i className="fas fa-sort-amount-down"></i>
+                        )}
+                        Date {sortBy === 'oldest' ? '(Old)' : '(New)'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">View</h3>
+                    <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm w-fit overflow-hidden">
+                      <button
+                        onClick={() => setViewMode('grid')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                          ${viewMode === 'grid' 
+                            ? 'bg-slate-900 dark:bg-blue-600 text-white' 
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                        title="Grid View"
+                      >
+                        <i className="fas fa-th-large"></i>
+                      </button>
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                          ${viewMode === 'list' 
+                            ? 'bg-slate-900 dark:bg-blue-600 text-white' 
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                        title="List View"
+                      >
+                        <i className="fas fa-list"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
             
@@ -316,7 +349,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Papers Grid */}
+        {/* Papers Grid/List */}
         {isScanning ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -336,11 +369,19 @@ const App: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {processedPapers.map((paper) => (
-              <PaperCard key={paper.id} paper={paper} />
-            ))}
-          </div>
+          viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {processedPapers.map((paper) => (
+                <PaperCard key={paper.id} paper={paper} />
+              ))}
+            </div>
+          ) : (
+             <div className="flex flex-col gap-3">
+               {processedPapers.map((paper) => (
+                 <PaperListItem key={paper.id} paper={paper} />
+               ))}
+             </div>
+          )
         )}
 
         {/* Empty State */}
