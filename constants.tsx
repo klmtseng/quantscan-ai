@@ -3,6 +3,7 @@ import React from 'react';
 
 export const TOPICS = [
   { id: 'All', label: 'All Research', icon: <i className="fas fa-globe"></i> },
+  { id: 'QuantFinance', label: 'Quant Finance', icon: <i className="fas fa-calculator"></i> },
   { id: 'Momentum', label: 'Momentum', icon: <i className="fas fa-chart-line"></i> },
   { id: 'Crypto', label: 'Crypto', icon: <i className="fas fa-bitcoin-sign"></i> },
   { id: 'ML', label: 'Machine Learning', icon: <i className="fas fa-brain"></i> },

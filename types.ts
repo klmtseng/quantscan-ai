@@ -20,6 +20,7 @@ export interface ScannerState {
 
 export type ResearchTopic = 
   | 'All' 
+  | 'QuantFinance'
   | 'Momentum' 
   | 'Crypto' 
   | 'ML' 
