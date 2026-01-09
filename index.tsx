@@ -11,13 +11,13 @@ import NewsModal from './components/NewsModal';
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
-import { MessageBoard } from './components/MessageBoard';
+import MessageBoard from './components/MessageBoard';
 
 const App: React.FC = () => {
   // Papers state now holds the fetched data
   const [papers, setPapers] = useState<ResearchPaper[]>([]);
-  // Default to 'QuantFinance' as requested, now an array
-  const [activeTopics, setActiveTopics] = useState<ResearchTopic[]>(['QuantFinance']);
+  // Default to 'QuantFinance' as requested
+  const [activeTopic, setActiveTopic] = useState<ResearchTopic>('QuantFinance');
   // Initialize with ALL sources selected so they appear "pressed down" by default
   const [selectedSources, setSelectedSources] = useState<string[]>(DATA_SOURCES.map(s => s.id));
   // Default to 'Month'
@@ -33,6 +33,7 @@ const App: React.FC = () => {
   });
   
   const [isScanning, setIsScanning] = useState(false);
+  const [visitCount, setVisitCount] = useState<number>(0);
   
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
@@ -40,6 +41,16 @@ const App: React.FC = () => {
     }
     return 'light';
   });
+
+  useEffect(() => {
+    // Simple simulated visitor counter persisting in localStorage
+    const stored = localStorage.getItem('quantscan_visits');
+    // Start at a "realistic" base number if new user, otherwise increment
+    let count = stored ? parseInt(stored) : 10423;
+    count++;
+    localStorage.setItem('quantscan_visits', count.toString());
+    setVisitCount(count);
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -68,34 +79,8 @@ const App: React.FC = () => {
   };
 
   const handleTopicChange = (topic: ResearchTopic) => {
-    setSearchTerm(''); // Clear search term when switching topics
-
-    if (topic === 'All') {
-      setActiveTopics(['All']);
-      return;
-    }
-
-    setActiveTopics(prev => {
-      // If we are currently on "All", remove it and start fresh with the new topic
-      if (prev.includes('All')) {
-        return [topic];
-      }
-
-      // Multi-select toggle logic
-      let newTopics: ResearchTopic[];
-      if (prev.includes(topic)) {
-        newTopics = prev.filter(t => t !== topic);
-      } else {
-        newTopics = [...prev, topic];
-      }
-
-      // If everything deselected, go back to All
-      if (newTopics.length === 0) {
-        return ['All'];
-      }
-
-      return newTopics;
-    });
+    setActiveTopic(topic);
+    setSearchTerm(''); // Clear search term when switching topics to allow default topic query
   };
 
   // Perform the actual API scan
@@ -105,7 +90,7 @@ const App: React.FC = () => {
     
     try {
       const result = await paperService.scanForPapers(
-        activeTopics,
+        activeTopic,
         selectedSources,
         datePreset,
         customRange,
@@ -126,7 +111,7 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
-  // Trigger scan when major "Query" filters change (Topics, Date, Sources)
+  // Trigger scan when major "Query" filters change (Topic, Date, Sources)
   const isFirstRun = useRef(true);
   useEffect(() => {
     if (isFirstRun.current) {
@@ -135,7 +120,7 @@ const App: React.FC = () => {
     }
     performScan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTopics, datePreset, selectedSources, customRange.start, customRange.end]);
+  }, [activeTopic, datePreset, selectedSources, customRange.start, customRange.end]);
 
 
   // Client-side filtering and sorting for search terms and sort order
@@ -205,6 +190,7 @@ const App: React.FC = () => {
         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
           <div className="flex flex-col gap-8 mb-10">
             {/* Main Controls Section */}
+            {/* Removed the split flex row layout (lg:flex-row) to remove the sidebar widget */}
             <div className="flex flex-col gap-6 w-full">
               <div className="space-y-6 w-full">
                 
@@ -212,24 +198,21 @@ const App: React.FC = () => {
                 <div>
                   <h2 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 pl-1">Research Categories</h2>
                   <div className="flex flex-wrap gap-2">
-                    {TOPICS.map((topic) => {
-                      const isActive = activeTopics.includes(topic.id as ResearchTopic);
-                      return (
-                        <button
-                          key={topic.id}
-                          onClick={() => handleTopicChange(topic.id as ResearchTopic)}
-                          disabled={isScanning}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border shadow-sm
-                            ${isActive
-                              ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900 shadow-md' 
-                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                            } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <span>{topic.icon}</span>
-                          {topic.label}
-                        </button>
-                      );
-                    })}
+                    {TOPICS.map((topic) => (
+                      <button
+                        key={topic.id}
+                        onClick={() => handleTopicChange(topic.id as ResearchTopic)}
+                        disabled={isScanning}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border shadow-sm
+                          ${activeTopic === topic.id 
+                            ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900 shadow-md ring-2 ring-slate-500/20' 
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                          } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span>{topic.icon}</span>
+                        {topic.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -246,7 +229,7 @@ const App: React.FC = () => {
                           disabled={isScanning}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border
                             ${isSelected 
-                              ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900 shadow-md' 
+                              ? 'bg-slate-800 dark:bg-slate-100 border-slate-800 dark:border-slate-100 text-white dark:text-slate-900 shadow-md' 
                               : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-900'
                             } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -261,9 +244,7 @@ const App: React.FC = () => {
                 {/* Filters Row */}
                 <div className="flex flex-col md:flex-row gap-8 pt-2">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 pl-1">
-                      Publication Date
-                    </h3>
+                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 pl-1">Publication Date</h3>
                     <div className="flex flex-wrap gap-2">
                       <div className="flex bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         {DATE_PRESETS.map((preset) => (
@@ -288,14 +269,14 @@ const App: React.FC = () => {
                             type="date" 
                             value={customRange.start}
                             onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium px-3 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-slate-200 shadow-sm"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium px-3 py-2 rounded-xl focus:ring-2 focus:ring-slate-500/20 outline-none text-slate-700 dark:text-slate-200 shadow-sm"
                           />
                           <span className="text-slate-400 text-xs">to</span>
                           <input 
                             type="date" 
                             value={customRange.end}
                             onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium px-3 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-slate-200 shadow-sm"
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium px-3 py-2 rounded-xl focus:ring-2 focus:ring-slate-500/20 outline-none text-slate-700 dark:text-slate-200 shadow-sm"
                           />
                         </div>
                       )}
@@ -465,8 +446,12 @@ const App: React.FC = () => {
                 <p className="text-xs">
                     © {new Date().getFullYear()} Global Quantitative Finance Research Hub.
                 </p>
-                <p className="text-[10px] text-slate-500 mt-1 opacity-70">
-                    Today: {new Date().toLocaleDateString()}
+                {/* Increased opacity and font weight for better visibility */}
+                <p className="text-xs text-slate-400 font-medium mt-1 flex items-center justify-end gap-4">
+                    <span>Today: {new Date().toLocaleDateString()}</span>
+                    <span className="flex items-center gap-2 bg-slate-800/50 px-2 py-0.5 rounded-lg border border-slate-800" title="Total Views">
+                        <i className="fas fa-eye text-blue-500 dark:text-blue-400"></i> {visitCount.toLocaleString()}
+                    </span>
                 </p>
               </div>
             </div>
