@@ -9,33 +9,50 @@ export class GeminiService {
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   }
 
-  async scanForPapers(topic: string): Promise<{ papers: ResearchPaper[], sources: any[] }> {
+  async scanForPapers(
+    topic: string, 
+    sources: string[], 
+    datePreset: string, 
+    customRange?: { start: string, end: string }
+  ): Promise<{ papers: ResearchPaper[] }> {
+    
+    // Construct a readable date range string for the prompt
+    let timeFrame = "recent (last 6 months)";
+    const now = new Date();
+    
+    if (datePreset === 'Week') timeFrame = "the last 7 days";
+    else if (datePreset === 'Month') timeFrame = "the last 30 days";
+    else if (datePreset === 'Quarter') timeFrame = "the last 3 months";
+    else if (datePreset === 'Year') timeFrame = "the last 12 months";
+    else if (datePreset === 'Custom' && customRange) timeFrame = `between ${customRange.start} and ${customRange.end}`;
+
+    // Filter source list string
+    const sourceList = sources.length > 0 ? sources.join(", ") : "arXiv, SSRN, NBER, and major finance journals";
+
     const prompt = `
-      Search for the latest research papers (published in the last 6 months) from arXiv.org, SSRN.com, and financial journals about: ${topic}.
-      Focus on Quantitative Finance, Momentum Trading, and Cryptocurrency Asset Pricing.
-      
-      Extract a list of papers including:
-      - Title
-      - Authors
-      - Brief Abstract (max 2 sentences)
-      - Publication Date
-      - Source (arXiv, SSRN, etc.)
-      - Link to the paper
-      - Key Tags
-      
-      Return the results as a JSON array strictly following this structure:
+      Task: Search for real, existing research papers published in ${timeFrame}.
+      Topic: ${topic === 'All' ? 'Quantitative Finance, Asset Pricing, or Market Microstructure' : topic}.
+      Target Sources: ${sourceList}.
+
+      Strict Requirements:
+      1. ONLY return real papers that actually exist. Do not hallucinate titles.
+      2. The "url" field MUST be a valid, clickable link to the paper (Abstract page, PDF, or SSRN/arXiv page). Use Google Search results to find the correct URL.
+      3. If a paper is found but no URL is available, exclude it.
+      4. Format the output as a JSON object containing an array of papers.
+
+      Return the results strictly following this JSON schema:
       {
         "papers": [
           {
-            "id": "unique-string",
-            "title": "...",
-            "authors": ["Author 1", "Author 2"],
-            "abstract": "...",
+            "id": "generate-a-unique-id",
+            "title": "Exact Title of the Paper",
+            "authors": ["Author Name"],
+            "abstract": "A brief summary of the paper (1-2 sentences).",
             "date": "YYYY-MM-DD",
-            "source": "...",
-            "url": "...",
-            "tags": ["...", "..."],
-            "relevanceScore": 0-100
+            "source": "Source Name (e.g. arXiv, SSRN, JF)",
+            "url": "https://valid-url-to-paper...",
+            "tags": ["Tag1", "Tag2"],
+            "relevanceScore": 85
           }
         ]
       }
@@ -47,31 +64,35 @@ export class GeminiService {
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
+          responseMimeType: 'application/json'
         },
       });
 
       const text = response.text || '';
-      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-
-      // Since the model output might contain markdown formatting, we try to extract JSON
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return {
-            papers: parsed.papers || [],
-            sources: groundingChunks
-          };
-        } catch (e) {
-          console.error("Failed to parse JSON from Gemini response", e);
-        }
+      
+      // Clean up potential markdown formatting if strict JSON mode misses (though responseMimeType helps)
+      let cleanText = text;
+      if (text.startsWith('```json')) {
+        cleanText = text.replace(/```json\n|\n```/g, '');
+      } else if (text.startsWith('```')) {
+         cleanText = text.replace(/```\n|\n```/g, '');
       }
 
-      // Fallback: If no JSON, the app will handle empty/manual mapping if needed
-      return { papers: [], sources: groundingChunks };
+      try {
+        const parsed = JSON.parse(cleanText);
+        let papers: ResearchPaper[] = parsed.papers || [];
+        
+        // Post-processing to ensure basic validity
+        papers = papers.filter(p => p.title && p.url && p.url.startsWith('http'));
+
+        return { papers };
+      } catch (e) {
+        console.error("Failed to parse JSON from Gemini response", e);
+        return { papers: [] };
+      }
     } catch (error) {
       console.error("Error scanning papers:", error);
-      throw error;
+      return { papers: [] };
     }
   }
 }

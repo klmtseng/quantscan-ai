@@ -5,7 +5,7 @@ export interface ResearchPaper {
   authors: string[];
   abstract: string;
   date: string; // ISO format YYYY-MM-DD
-  source: 'arXiv' | 'SSRN' | 'Journal' | 'Other';
+  source: string;
   url: string;
   tags: string[];
   relevanceScore: number;

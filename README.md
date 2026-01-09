@@ -2,6 +2,7 @@
 
 QuantScan is a modern, responsive web application designed for quantitative finance researchers. It aggregates and filters research papers related to Momentum strategies, Cryptocurrency, Machine Learning, and High-Frequency Trading (HFT).
 
+![QuantScan Interface](https://via.placeholder.com/800x400?text=QuantScan+Interface+Preview)
 
 ## Features
 

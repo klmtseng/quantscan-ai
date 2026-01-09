@@ -6,16 +6,25 @@ interface PaperCardProps {
   paper: ResearchPaper;
 }
 
+const getSourceColor = (source: string) => {
+  const s = source.toLowerCase();
+  if (s.includes('arxiv')) return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400';
+  if (s.includes('ssrn')) return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+  if (s.includes('nber')) return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+  if (s.includes('jf') || s.includes('jfe') || s.includes('rfs') || s.includes('journal')) 
+    return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400';
+  if (s.includes('cfa') || s.includes('bis') || s.includes('fed')) 
+    return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400';
+  
+  return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400';
+};
+
 const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 hover:shadow-lg dark:hover:shadow-blue-900/10 transition-all duration-300 group">
       <div className="flex justify-between items-start mb-4">
         <div className="flex gap-2">
-          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${
-            paper.source === 'arXiv' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' : 
-            paper.source === 'SSRN' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 
-            'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400'
-          }`}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${getSourceColor(paper.source)}`}>
             {paper.source}
           </span>
           <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">

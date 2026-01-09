@@ -1,15 +1,19 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import Fuse from 'fuse.js';
 import Header from './components/Header';
 import PaperCard from './components/PaperCard';
 import ContactModal from './components/ContactModal';
+import { geminiService } from './services/geminiService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
-import { TOPICS, MOCK_PAPERS, DATE_PRESETS } from './constants';
+import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
 
 const App: React.FC = () => {
-  const [papers, setPapers] = useState<ResearchPaper[]>(MOCK_PAPERS);
+  // Papers state now holds the fetched data
+  const [papers, setPapers] = useState<ResearchPaper[]>([]);
   const [activeTopic, setActiveTopic] = useState<ResearchTopic>('All');
+  const [selectedSources, setSelectedSources] = useState<string[]>(DATA_SOURCES.map(s => s.id));
   const [datePreset, setDatePreset] = useState<DateFilterPreset>('Month');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +24,9 @@ const App: React.FC = () => {
   });
   
   const [isScanning, setIsScanning] = useState(false);
+  // Track if we have performed the initial load
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') as 'light' | 'dark' || 'light';
@@ -43,60 +50,98 @@ const App: React.FC = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const filteredAndSortedPapers = useMemo(() => {
-    const now = new Date();
-    let startDate: Date;
+  const toggleSource = (sourceId: string) => {
+    setSelectedSources(prev => {
+      if (prev.includes(sourceId)) {
+        return prev.filter(id => id !== sourceId);
+      } else {
+        return [...prev, sourceId];
+      }
+    });
+  };
 
-    if (datePreset === 'Custom') {
-      startDate = new Date(customRange.start);
-    } else {
-      startDate = new Date();
-      if (datePreset === 'Week') startDate.setDate(now.getDate() - 7);
-      else if (datePreset === 'Month') startDate.setMonth(now.getMonth() - 1);
-      else if (datePreset === 'Quarter') startDate.setMonth(now.getMonth() - 3);
-      else if (datePreset === 'Year') startDate.setFullYear(now.getFullYear() - 1);
+  // Perform the actual API scan
+  const performScan = async () => {
+    if (isScanning) return;
+    setIsScanning(true);
+    
+    try {
+      const result = await geminiService.scanForPapers(
+        activeTopic,
+        selectedSources,
+        datePreset,
+        customRange
+      );
+      
+      // If we got results, replace the list. If empty, we might want to keep previous or show empty state.
+      // Here we replace to reflect the 'Filter' accurately.
+      setPapers(result.papers);
+    } catch (error) {
+      console.error("Scan failed", error);
+    } finally {
+      setIsScanning(false);
+      setInitialLoadDone(true);
+    }
+  };
+
+  // Initial Scan on mount
+  useEffect(() => {
+    performScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Trigger scan when major "Query" filters change (Topic, Date, Sources)
+  // We debounce this slightly or just run it. Given the cost, we might prefer manual update, 
+  // but to keep the UI responsive to "Filters", we run it.
+  // Using a ref to skip the very first render double-call if strict mode is on
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    performScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTopic, datePreset, selectedSources, customRange.start, customRange.end]);
+
+
+  // Client-side filtering and sorting for search terms and sort order
+  // This runs on the *fetched* papers
+  const processedPapers = useMemo(() => {
+    let results = [...papers];
+
+    // 1. Text Search (Fuzzy)
+    if (searchTerm.trim()) {
+      const fuse = new Fuse(results, {
+        keys: [
+          { name: 'title', weight: 2 },
+          { name: 'abstract', weight: 1 },
+          { name: 'authors', weight: 0.5 },
+          { name: 'tags', weight: 0.5 },
+          { name: 'source', weight: 0.3 }
+        ],
+        threshold: 0.4, 
+        ignoreLocation: true,
+        includeScore: true
+      });
+      
+      const fuseResults = fuse.search(searchTerm);
+      results = fuseResults.map(result => result.item);
     }
 
-    const endDate = datePreset === 'Custom' ? new Date(customRange.end) : now;
-
-    // 1. Filter
-    const filtered = MOCK_PAPERS.filter(paper => {
-      const paperDate = new Date(paper.date);
-      const matchesDate = paperDate >= startDate && paperDate <= endDate;
-      const matchesTopic = activeTopic === 'All' || paper.tags.includes(activeTopic);
-      
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = searchTerm === '' || 
-        paper.title.toLowerCase().includes(searchLower) || 
-        paper.abstract.toLowerCase().includes(searchLower);
-
-      return matchesDate && matchesTopic && matchesSearch;
-    });
-
     // 2. Sort
-    return [...filtered].sort((a, b) => {
+    return results.sort((a, b) => {
       if (sortBy === 'newest') {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       } else if (sortBy === 'oldest') {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       } else if (sortBy === 'relevance') {
+        if (searchTerm.trim()) return 0; // Keep fuse ranking if searching
         return b.relevanceScore - a.relevanceScore;
       }
       return 0;
     });
-  }, [activeTopic, datePreset, customRange, searchTerm, sortBy]);
-
-  const performScan = async () => {
-    setIsScanning(true);
-    // Simulate scan delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setPapers(filteredAndSortedPapers);
-    setIsScanning(false);
-  };
-
-  useEffect(() => {
-    performScan();
-  }, [activeTopic, datePreset, customRange, searchTerm, sortBy]);
+  }, [papers, searchTerm, sortBy]);
 
   const handleDateSortToggle = () => {
     if (sortBy === 'newest') {
@@ -120,31 +165,71 @@ const App: React.FC = () => {
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="flex flex-col gap-8 mb-10">
           {/* Main Controls Section */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
             <div className="space-y-6 w-full lg:w-3/4">
+              
+              {/* Research Categories */}
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-4">Research Categories</h2>
-                <div className="flex flex-wrap bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 w-fit shadow-sm">
+                <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Research Categories</h2>
+                <div className="flex flex-wrap gap-2">
                   {TOPICS.map((topic) => (
                     <button
                       key={topic.id}
                       onClick={() => setActiveTopic(topic.id as ResearchTopic)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                      disabled={isScanning}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border
                         ${activeTopic === topic.id 
-                          ? 'bg-blue-600 text-white shadow-md' 
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
-                        }`}
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700'
+                        } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      <span className={activeTopic === topic.id ? 'text-white' : 'text-blue-600 dark:text-blue-400'}>
-                        {topic.icon}
-                      </span>
+                      <span>{topic.icon}</span>
                       {topic.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-8">
+              {/* Data Sources */}
+              <div>
+                <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Data Sources</h2>
+                <div className="flex flex-wrap gap-2">
+                  {DATA_SOURCES.map((source) => {
+                    const isSelected = selectedSources.includes(source.id);
+                    return (
+                      <button
+                        key={source.id}
+                        onClick={() => toggleSource(source.id)}
+                        disabled={isScanning}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border
+                          ${isSelected 
+                            ? 'bg-slate-800 dark:bg-slate-200 border-slate-800 dark:border-slate-200 text-white dark:text-slate-900' 
+                            : 'bg-transparent border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-400 dark:hover:border-slate-600'
+                          } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {source.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => {
+                        if (isScanning) return;
+                        if (selectedSources.length === DATA_SOURCES.length) {
+                            setSelectedSources([]);
+                        } else {
+                            setSelectedSources(DATA_SOURCES.map(s => s.id));
+                        }
+                    }}
+                    disabled={isScanning}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                  >
+                    {selectedSources.length === DATA_SOURCES.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters Row */}
+              <div className="flex flex-col md:flex-row gap-8 pt-2">
                 <div>
                   <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Publication Date</h3>
                   <div className="flex flex-wrap gap-2">
@@ -153,11 +238,12 @@ const App: React.FC = () => {
                         <button
                           key={preset.id}
                           onClick={() => setDatePreset(preset.id as DateFilterPreset)}
+                          disabled={isScanning}
                           className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
                             ${datePreset === preset.id 
                               ? 'bg-slate-900 dark:bg-blue-600 text-white' 
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                            }`}
+                            } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {preset.label}
                         </button>
@@ -224,15 +310,17 @@ const App: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm self-start lg:self-auto ml-auto">
               <div className="text-right">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Database</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-200">Local Archive</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-200">Gemini Live Search</p>
               </div>
               <div className="w-px h-8 bg-slate-100 dark:bg-slate-800"></div>
               <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 ${isScanning ? 'duration-500' : ''}`}></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
-                <span className="text-sm font-bold tracking-tight">Active Filter</span>
+                <span className="text-sm font-bold tracking-tight">
+                  {isScanning ? 'Scanning Web...' : 'Live'}
+                </span>
               </div>
             </div>
           </div>
@@ -241,7 +329,7 @@ const App: React.FC = () => {
         {/* Papers Grid */}
         {isScanning ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 animate-pulse shadow-sm">
                 <div className="flex justify-between mb-4">
                   <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-1/4"></div>
@@ -259,26 +347,29 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {papers.map((paper) => (
+            {processedPapers.map((paper) => (
               <PaperCard key={paper.id} paper={paper} />
             ))}
           </div>
         )}
 
         {/* Empty State */}
-        {!isScanning && papers.length === 0 && (
+        {!isScanning && processedPapers.length === 0 && (
           <div className="text-center py-32 bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl shadow-inner">
             <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300 dark:text-slate-700">
-              <i className="fas fa-calendar-xmark text-3xl"></i>
+              <i className="fas fa-search text-3xl"></i>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Papers Match Filters</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Papers Found</h3>
             <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8">
-              {searchTerm ? `No results found for "${searchTerm}".` : "Try adjusting your filters to find research."}
+              {searchTerm 
+                ? `No papers matched "${searchTerm}".` 
+                : "No papers found for this criteria. Try expanding your date range or selecting more sources."}
             </p>
             <button 
               onClick={() => {
                 setDatePreset('Year');
                 setActiveTopic('All');
+                setSelectedSources(DATA_SOURCES.map(s => s.id));
                 setSearchTerm('');
                 setSortBy('relevance');
               }}
