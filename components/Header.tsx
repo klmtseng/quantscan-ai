@@ -61,6 +61,18 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Actions */}
         <div className="flex items-center gap-3 shrink-0">
+          
+          {/* Status Indicator (Moved from Index) */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mr-2">
+             <span className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 ${isScanning ? 'duration-500' : ''}`}></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                {isScanning ? 'Fetching API...' : 'Live API'}
+              </span>
+          </div>
+
           <button 
             onClick={toggleTheme}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all active:scale-95 border border-transparent dark:border-slate-800"

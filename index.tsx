@@ -6,6 +6,7 @@ import Header from './components/Header';
 import PaperCard from './components/PaperCard';
 import PaperListItem from './components/PaperListItem';
 import ContactModal from './components/ContactModal';
+import NewsModal from './components/NewsModal';
 // Switched from geminiService to paperService
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
@@ -14,8 +15,8 @@ import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
 const App: React.FC = () => {
   // Papers state now holds the fetched data
   const [papers, setPapers] = useState<ResearchPaper[]>([]);
-  // Default to 'QuantFinance' as requested
-  const [activeTopic, setActiveTopic] = useState<ResearchTopic>('QuantFinance');
+  // Default to 'QuantFinance' as requested, now an array
+  const [activeTopics, setActiveTopics] = useState<ResearchTopic[]>(['QuantFinance']);
   // Initialize with ALL sources selected so they appear "pressed down" by default
   const [selectedSources, setSelectedSources] = useState<string[]>(DATA_SOURCES.map(s => s.id));
   // Default to 'Month'
@@ -24,6 +25,7 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [isNewsOpen, setIsNewsOpen] = useState(false);
   const [customRange, setCustomRange] = useState<DateRange>({
     start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -65,8 +67,34 @@ const App: React.FC = () => {
   };
 
   const handleTopicChange = (topic: ResearchTopic) => {
-    setActiveTopic(topic);
-    setSearchTerm(''); // Clear search term when switching topics to allow default topic query
+    setSearchTerm(''); // Clear search term when switching topics
+
+    if (topic === 'All') {
+      setActiveTopics(['All']);
+      return;
+    }
+
+    setActiveTopics(prev => {
+      // If we are currently on "All", remove it and start fresh with the new topic
+      if (prev.includes('All')) {
+        return [topic];
+      }
+
+      // Multi-select toggle logic
+      let newTopics: ResearchTopic[];
+      if (prev.includes(topic)) {
+        newTopics = prev.filter(t => t !== topic);
+      } else {
+        newTopics = [...prev, topic];
+      }
+
+      // If everything deselected, go back to All
+      if (newTopics.length === 0) {
+        return ['All'];
+      }
+
+      return newTopics;
+    });
   };
 
   // Perform the actual API scan
@@ -76,7 +104,7 @@ const App: React.FC = () => {
     
     try {
       const result = await paperService.scanForPapers(
-        activeTopic,
+        activeTopics,
         selectedSources,
         datePreset,
         customRange,
@@ -97,7 +125,7 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
-  // Trigger scan when major "Query" filters change (Topic, Date, Sources)
+  // Trigger scan when major "Query" filters change (Topics, Date, Sources)
   const isFirstRun = useRef(true);
   useEffect(() => {
     if (isFirstRun.current) {
@@ -106,7 +134,7 @@ const App: React.FC = () => {
     }
     performScan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTopic, datePreset, selectedSources, customRange.start, customRange.end]);
+  }, [activeTopics, datePreset, selectedSources, customRange.start, customRange.end]);
 
 
   // Client-side filtering and sorting for search terms and sort order
@@ -176,28 +204,31 @@ const App: React.FC = () => {
         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
           <div className="flex flex-col gap-8 mb-10">
             {/* Main Controls Section */}
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-              <div className="space-y-6 w-full lg:w-3/4">
+            <div className="flex flex-col gap-6 w-full">
+              <div className="space-y-6 w-full">
                 
                 {/* Research Categories */}
                 <div>
                   <h2 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 pl-1">Research Categories</h2>
                   <div className="flex flex-wrap gap-2">
-                    {TOPICS.map((topic) => (
-                      <button
-                        key={topic.id}
-                        onClick={() => handleTopicChange(topic.id as ResearchTopic)}
-                        disabled={isScanning}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border shadow-sm
-                          ${activeTopic === topic.id 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-blue-500/20' 
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
-                          } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <span>{topic.icon}</span>
-                        {topic.label}
-                      </button>
-                    ))}
+                    {TOPICS.map((topic) => {
+                      const isActive = activeTopics.includes(topic.id as ResearchTopic);
+                      return (
+                        <button
+                          key={topic.id}
+                          onClick={() => handleTopicChange(topic.id as ResearchTopic)}
+                          disabled={isScanning}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border shadow-sm
+                            ${isActive
+                              ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-lg shadow-slate-900/20 dark:shadow-blue-900/30 border-slate-900 dark:border-blue-600' 
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                            } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <span>{topic.icon}</span>
+                          {topic.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -335,23 +366,6 @@ const App: React.FC = () => {
 
                 </div>
               </div>
-              
-              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm self-start lg:self-auto ml-auto">
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Database</p>
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-200">Live API Aggregator</p>
-                </div>
-                <div className="w-px h-8 bg-slate-100 dark:bg-slate-800"></div>
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <span className="relative flex h-3 w-3">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 ${isScanning ? 'duration-500' : ''}`}></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                  </span>
-                  <span className="text-sm font-bold tracking-tight">
-                    {isScanning ? 'Fetching APIs...' : 'Online'}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -425,14 +439,17 @@ const App: React.FC = () => {
                 <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white shadow-lg shadow-blue-900/50">
                   <i className="fas fa-microchip"></i>
                 </div>
-                <span className="text-lg font-bold text-white">QuantScan</span>
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-white leading-none">QuantScan</span>
+                  <span className="text-[10px] font-mono text-slate-400 mt-1">v1.1.0</span>
+                </div>
               </div>
               <div className="flex gap-8 text-sm font-medium">
-                <a href="#" className="hover:text-white transition-colors">Documentation</a>
-                <a href="#" className="hover:text-white transition-colors">Research Hub</a>
+                <a href="https://github.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Documentation</a>
+                <button onClick={() => setIsNewsOpen(true)} className="hover:text-white transition-colors text-left">News</button>
                 <button 
                   onClick={() => setIsContactOpen(true)}
-                  className="hover:text-white transition-colors bg-white/5 px-4 py-1.5 rounded-lg border border-white/10 hover:border-white/20 hover:bg-white/10"
+                  className="hover:text-white transition-colors text-left"
                 >
                   Contact Me
                 </button>
@@ -454,6 +471,10 @@ const App: React.FC = () => {
           isOpen={isContactOpen} 
           onClose={() => setIsContactOpen(false)} 
           email="aaron.jsfund@gmail.com"
+        />
+        <NewsModal 
+          isOpen={isNewsOpen}
+          onClose={() => setIsNewsOpen(false)}
         />
       </div>
     </div>

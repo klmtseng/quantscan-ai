@@ -32,7 +32,10 @@ const PaperListItem: React.FC<PaperListItemProps> = ({ paper }) => {
         {/* Left: Source & Date */}
         {/* Changed layout: Stack vertically on desktop (md:flex-col) to handle long source names gracefully */}
         <div className="flex flex-row md:flex-col items-center md:items-start gap-3 md:gap-1.5 w-full md:w-40 shrink-0">
-          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md leading-tight ${getSourceColor(paper.source)}`}>
+          <span 
+            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md leading-tight line-clamp-2 text-ellipsis overflow-hidden max-w-full ${getSourceColor(paper.source)}`}
+            title={paper.source}
+          >
             {paper.source}
           </span>
           <span className="text-slate-400 dark:text-slate-500 text-[10px] font-mono whitespace-nowrap pl-0.5">
