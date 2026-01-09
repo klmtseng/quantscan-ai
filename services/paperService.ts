@@ -1,6 +1,50 @@
 
 import { ResearchPaper } from "../types";
 
+// Helper to calculate a dynamic relevance score
+const calculateRelevance = (title: string, abstract: string, date: string, tags: string[]): number => {
+  let score = 65; // Base score
+
+  const text = (title + " " + abstract).toLowerCase();
+  const titleText = title.toLowerCase();
+
+  // 1. Tag Bonus: More detected tags = higher relevance to our specific domain
+  score += (tags.length * 4);
+
+  // 2. Recency Bonus
+  try {
+    const pubDate = new Date(date);
+    const now = new Date();
+    const daysOld = (now.getTime() - pubDate.getTime()) / (1000 * 3600 * 24);
+
+    if (daysOld < 7) score += 15;        // Super fresh
+    else if (daysOld < 30) score += 10;  // Fresh
+    else if (daysOld < 90) score += 5;   // Recent
+    else if (daysOld > 365) score -= 5;  // Older than a year
+  } catch (e) {
+    // Ignore date parsing errors
+  }
+
+  // 3. High Value Keywords (Scoring Boost)
+  const highValueKeywords = [
+    'momentum', 'alpha', 'arbitrage', 'neural network', 'transformer', 
+    'liquidity', 'high frequency', 'microstructure', 'portfolio optimization',
+    'asset pricing', 'volatility', 'predicting', 'forecasting'
+  ];
+
+  highValueKeywords.forEach(k => {
+    if (titleText.includes(k)) score += 5; // Title match is strong
+    else if (text.includes(k)) score += 2; // Abstract match
+  });
+
+  // 4. Abstract Quality (Proxy)
+  if (abstract.length > 500) score += 3;
+  if (abstract.length < 50) score -= 10; // Penalty for missing/short abstract
+
+  // Clamp score between 60 and 99
+  return Math.min(99, Math.max(60, Math.floor(score)));
+};
+
 // Helper to generate smart tags based on content
 const generateTags = (title: string, abstract: string): string[] => {
   const text = (title + " " + abstract).toLowerCase();
@@ -69,6 +113,9 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
 
     const tags = generateTags(title, summary);
     if (tags.length === 0) tags.push("Pre-print");
+    
+    // Calculate Score
+    const score = calculateRelevance(title, summary, published.split("T")[0], tags);
 
     return {
       id,
@@ -79,7 +126,7 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
       source: "arXiv (q-fin)",
       url: link,
       tags: tags,
-      relevanceScore: 100
+      relevanceScore: score
     };
   });
 };
@@ -130,6 +177,9 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
 
     const tags = generateTags(work.title, abstract);
     if (tags.length === 0) tags.push("Research");
+    
+    // Calculate Score
+    const score = calculateRelevance(work.title, abstract, work.publication_date, tags);
 
     return {
       id: work.id,
@@ -140,7 +190,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
       source: sourceName || "OpenAlex",
       url: work.doi || work.primary_location?.landing_page_url || "",
       tags: tags,
-      relevanceScore: 90
+      relevanceScore: score
     };
   });
 };
@@ -158,21 +208,21 @@ const createAbstractFromInvertedIndex = (invertedIndex: any) => {
 };
 
 // Helper to get raw keywords for a single topic
-const getTopicKeywords = (topic: string): string => {
+const getTopicKeywords = (topic: string): string[] => {
     switch(topic) {
-        case 'All': return "";
-        case 'QuantFinance': return "quantitative finance empirical asset pricing";
-        case 'Momentum': return "momentum strategy asset pricing";
-        case 'Crypto': return "cryptocurrency bitcoin defi";
-        case 'ML': return "machine learning finance neural networks";
-        case 'HFT': return "high frequency trading microstructure liquidity";
-        case 'Risk': return "risk management value at risk volatility";
-        case 'FixedIncome': return "fixed income yield curve bond market";
-        case 'InternationalTax': return "international taxation tax avoidance BEPS corporate tax";
-        case 'TransferPricing': return "transfer pricing multinational enterprises profit shifting";
-        case 'ValueChain': return "global value chain supply chain finance economic value added";
-        case 'Transformation': return "digital transformation business model innovation finance automation";
-        default: return "";
+        case 'All': return [];
+        case 'QuantFinance': return ["quantitative finance", "empirical asset pricing", "asset pricing", "factor investing"];
+        case 'Momentum': return ["momentum strategy", "price momentum", "trend following"];
+        case 'Crypto': return ["cryptocurrency", "bitcoin", "ethereum", "defi", "blockchain finance"];
+        case 'ML': return ["machine learning finance", "neural network finance", "deep learning asset pricing", "financial nlp", "large language model finance"];
+        case 'HFT': return ["high frequency trading", "market microstructure", "limit order book", "liquidity provision"];
+        case 'Risk': return ["risk management", "value at risk", "portfolio optimization", "tail risk"];
+        case 'FixedIncome': return ["fixed income", "yield curve", "corporate bond", "sovereign debt", "treasury"];
+        case 'InternationalTax': return ["international taxation", "beps", "corporate tax avoidance", "global tax"];
+        case 'TransferPricing': return ["transfer pricing", "profit shifting", "multinational tax"];
+        case 'ValueChain': return ["global value chain", "supply chain finance"];
+        case 'Transformation': return ["digital transformation finance", "fintech innovation", "financial automation"];
+        default: return [];
     }
 }
 
@@ -207,21 +257,22 @@ export class PaperService {
     // 2. Prepare Search Query Terms (Union Logic)
     // We want (TopicA Keywords) OR (TopicB Keywords)
     
-    // First, collect all keyword strings from selected topics
-    let topicQueryParts: string[] = [];
+    // First, collect all specific keyword phrases from selected topics
+    let topicPhrases: string[] = [];
     if (topics.includes('All')) {
-        topicQueryParts = []; // Global search, no specific topic limits
+        topicPhrases = []; // Global search, no specific topic limits
     } else {
-        topicQueryParts = topics
-            .map(t => getTopicKeywords(t))
-            .filter(k => k.length > 0);
+        // Flatten array of arrays
+        topics.forEach(t => {
+            topicPhrases = [...topicPhrases, ...getTopicKeywords(t)];
+        });
     }
 
     const cleanSearch = searchTerm ? searchTerm.trim() : "";
 
     // If we have no topics selected (shouldn't happen due to UI defaults) and no search term, default to "finance"
-    if (topicQueryParts.length === 0 && !cleanSearch && !topics.includes('All')) {
-        topicQueryParts = ["quantitative finance"];
+    if (topicPhrases.length === 0 && !cleanSearch && !topics.includes('All')) {
+        topicPhrases = ["quantitative finance"];
     }
 
     const promises = [];
@@ -234,10 +285,10 @@ export class PaperService {
       // Construct ArXiv Query: (all:Topic1 OR all:Topic2) AND all:SearchTerm
       let mainPart = "";
       
-      if (topicQueryParts.length > 0) {
+      if (topicPhrases.length > 0) {
           // Join topic parts with OR
           // e.g. all:momentum+OR+all:bitcoin
-          const joinedTopics = topicQueryParts.map(t => `all:${encodeURIComponent(t)}`).join('+OR+');
+          const joinedTopics = topicPhrases.map(t => `all:"${encodeURIComponent(t)}"`).join('+OR+');
           mainPart = `(${joinedTopics})`;
       }
 
@@ -269,10 +320,11 @@ export class PaperService {
     let openAlexSearchQuery = "";
     
     // Build Topic OR part: (TopicA|TopicB)
-    if (topicQueryParts.length > 0) {
+    if (topicPhrases.length > 0) {
         // OpenAlex uses | for OR. 
+        // We use quotes around specific multi-word phrases to be precise.
         // e.g. "momentum strategy"|"bitcoin"
-        const joined = topicQueryParts.map(t => `"${t}"`).join('|'); 
+        const joined = topicPhrases.map(t => `"${t}"`).join('|'); 
         openAlexSearchQuery = `default.search:${encodeURIComponent(joined)}`;
     }
 
@@ -350,9 +402,16 @@ export class PaperService {
     // Client-side date filter (strict) for arXiv results which might return older ones despite sort
     const dateLimit = new Date(fromDate);
     
+    // Construct local "today" string to avoid UTC timezone issues showing "tomorrow's" papers
+    const d = new Date();
+    const today = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+    
     // Ensure we handle invalid dates gracefully
     if (!isNaN(dateLimit.getTime())) {
        allPapers = allPapers.filter(p => {
+         // Exclude future dates (strictly greater than today)
+         if (p.date > today) return false;
+
          const pDate = new Date(p.date);
          return !isNaN(pDate.getTime()) && pDate >= dateLimit;
        });

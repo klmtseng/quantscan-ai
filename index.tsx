@@ -11,6 +11,7 @@ import NewsModal from './components/NewsModal';
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
+import { MessageBoard } from './components/MessageBoard';
 
 const App: React.FC = () => {
   // Papers state now holds the fetched data
@@ -220,7 +221,7 @@ const App: React.FC = () => {
                           disabled={isScanning}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border shadow-sm
                             ${isActive
-                              ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-lg shadow-slate-900/20 dark:shadow-blue-900/30 border-slate-900 dark:border-blue-600' 
+                              ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900 shadow-md' 
                               : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                             } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -245,7 +246,7 @@ const App: React.FC = () => {
                           disabled={isScanning}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border
                             ${isSelected 
-                              ? 'bg-slate-800 dark:bg-slate-100 border-slate-800 dark:border-slate-100 text-white dark:text-slate-900 shadow-md' 
+                              ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900 shadow-md' 
                               : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-900'
                             } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -260,7 +261,9 @@ const App: React.FC = () => {
                 {/* Filters Row */}
                 <div className="flex flex-col md:flex-row gap-8 pt-2">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 pl-1">Publication Date</h3>
+                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 pl-1">
+                      Publication Date
+                    </h3>
                     <div className="flex flex-wrap gap-2">
                       <div className="flex bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         {DATE_PRESETS.map((preset) => (
@@ -270,7 +273,7 @@ const App: React.FC = () => {
                             disabled={isScanning}
                             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
                               ${datePreset === preset.id 
-                                ? 'bg-slate-900 dark:bg-blue-600 text-white shadow' 
+                                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' 
                                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                               } ${isScanning ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
@@ -308,7 +311,7 @@ const App: React.FC = () => {
                           onClick={() => setSortBy('relevance')}
                           className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
                             ${sortBy === 'relevance' 
-                              ? 'bg-slate-900 dark:bg-blue-600 text-white shadow' 
+                              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' 
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                         >
@@ -321,7 +324,7 @@ const App: React.FC = () => {
                           onClick={handleDateSortToggle}
                           className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
                             ${(sortBy === 'newest' || sortBy === 'oldest') 
-                              ? 'bg-slate-900 dark:bg-blue-600 text-white shadow' 
+                              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' 
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                         >
@@ -342,7 +345,7 @@ const App: React.FC = () => {
                           onClick={() => setViewMode('grid')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
                             ${viewMode === 'grid' 
-                              ? 'bg-slate-900 dark:bg-blue-600 text-white shadow' 
+                              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' 
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                           title="Grid View"
@@ -353,7 +356,7 @@ const App: React.FC = () => {
                           onClick={() => setViewMode('list')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
                             ${viewMode === 'list' 
-                              ? 'bg-slate-900 dark:bg-blue-600 text-white shadow' 
+                              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' 
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                           title="List View"
@@ -430,6 +433,10 @@ const App: React.FC = () => {
               </button>
             </div>
           )}
+
+          {/* Message Board Section */}
+          <MessageBoard />
+
         </main>
 
         <footer className="bg-slate-900 dark:bg-black text-slate-500 py-12 mt-20 transition-colors border-t border-slate-800">
@@ -454,9 +461,14 @@ const App: React.FC = () => {
                   Contact Me
                 </button>
               </div>
-              <p className="text-xs">
-                © {new Date().getFullYear()} Global Quantitative Finance Research Hub.
-              </p>
+              <div className="text-right">
+                <p className="text-xs">
+                    © {new Date().getFullYear()} Global Quantitative Finance Research Hub.
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1 opacity-70">
+                    Today: {new Date().toLocaleDateString()}
+                </p>
+              </div>
             </div>
             <div className="mt-8 pt-8 border-t border-slate-800 text-center">
               <p className="text-[10px] uppercase tracking-widest leading-loose opacity-60">
