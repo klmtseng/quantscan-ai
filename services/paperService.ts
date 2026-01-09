@@ -192,6 +192,7 @@ export class PaperService {
       queryTerm = searchTerm.trim();
     } else {
       switch(topic) {
+        case 'All': queryTerm = ""; break; // Explicitly empty for All to capture entire feed from sources
         case 'Momentum': queryTerm = "momentum strategy asset pricing"; break;
         case 'Crypto': queryTerm = "cryptocurrency bitcoin defi"; break;
         case 'ML': queryTerm = "machine learning finance neural networks"; break;
@@ -212,7 +213,9 @@ export class PaperService {
     // 3. Fetch from arXiv (XML)
     // Only if arXiv is selected or All sources
     if (useAllSources || sources.includes('arXiv')) {
-      const arxivUrl = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*&sortBy=submittedDate&sortOrder=descending&max_results=30`;
+      // If queryTerm is empty, just fetch everything in q-fin category
+      const q = queryTerm ? `all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*` : `cat:q-fin.*`;
+      const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=30`;
       
       promises.push(
         fetch(arxivUrl)
@@ -227,7 +230,14 @@ export class PaperService {
 
     // 4. Fetch from OpenAlex (SSRN Specific)
     if (useAllSources || sources.includes('SSRN')) {
-       const ssrnUrl = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},primary_location.source.display_name:ssrn,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       // If queryTerm is empty, we don't apply search filter, just source and date.
+       // Note: This might return non-finance papers if they are on SSRN, but satisfies "All Research" request.
+       let filter = `primary_location.source.display_name:ssrn,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+         filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
+
+       const ssrnUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
 
        promises.push(
         fetch(ssrnUrl)
@@ -242,7 +252,12 @@ export class PaperService {
 
     // 5. Fetch BIS (Bank for International Settlements)
     if (useAllSources || sources.includes('BIS')) {
-       const url = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},institutions.search:Bank%20for%20International%20Settlements,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       let filter = `institutions.search:Bank%20for%20International%20Settlements,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
+       
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
         fetch(url)
           .then(res => res.json())
@@ -256,8 +271,12 @@ export class PaperService {
 
     // 6. Fetch Federal Reserve (FED)
     if (useAllSources || sources.includes('FED')) {
-       // Using 'Federal Reserve' in institution search captures the system
-       const url = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},institutions.search:Federal%20Reserve,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       let filter = `institutions.search:Federal%20Reserve,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
+
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
         fetch(url)
           .then(res => res.json())
@@ -271,7 +290,12 @@ export class PaperService {
 
     // 7. Fetch BLS (Bureau of Labor Statistics)
     if (useAllSources || sources.includes('BLS')) {
-       const url = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},institutions.search:Bureau%20of%20Labor%20Statistics,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       let filter = `institutions.search:Bureau%20of%20Labor%20Statistics,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
+
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
         fetch(url)
           .then(res => res.json())
@@ -285,7 +309,12 @@ export class PaperService {
 
     // 8. Fetch from OpenAlex (General Journals)
     if (useAllSources || sources.includes('OpenAlex')) {
-       const openAlexUrl = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       // For general bucket, "All" needs to be bounded to domain to avoid unrelated sciences.
+       // We use "finance economics" as a safe fallback if query is empty.
+       const effectiveQuery = queryTerm || "finance economics";
+       const filter = `default.search:${encodeURIComponent(effectiveQuery)},from_publication_date:${fromDate}`;
+       
+       const openAlexUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
 
        promises.push(
         fetch(openAlexUrl)
