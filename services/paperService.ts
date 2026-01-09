@@ -207,29 +207,10 @@ const createAbstractFromInvertedIndex = (invertedIndex: any) => {
   return words.join(" ");
 };
 
-// Helper to get raw keywords for a single topic
-const getTopicKeywords = (topic: string): string[] => {
-    switch(topic) {
-        case 'All': return [];
-        case 'QuantFinance': return ["quantitative finance", "empirical asset pricing", "asset pricing", "factor investing"];
-        case 'Momentum': return ["momentum strategy", "price momentum", "trend following"];
-        case 'Crypto': return ["cryptocurrency", "bitcoin", "ethereum", "defi", "blockchain finance"];
-        case 'ML': return ["machine learning finance", "neural network finance", "deep learning asset pricing", "financial nlp", "large language model finance"];
-        case 'HFT': return ["high frequency trading", "market microstructure", "limit order book", "liquidity provision"];
-        case 'Risk': return ["risk management", "value at risk", "portfolio optimization", "tail risk"];
-        case 'FixedIncome': return ["fixed income", "yield curve", "corporate bond", "sovereign debt", "treasury"];
-        case 'InternationalTax': return ["international taxation", "beps", "corporate tax avoidance", "global tax"];
-        case 'TransferPricing': return ["transfer pricing", "profit shifting", "multinational tax"];
-        case 'ValueChain': return ["global value chain", "supply chain finance"];
-        case 'Transformation': return ["digital transformation finance", "fintech innovation", "financial automation"];
-        default: return [];
-    }
-}
-
 export class PaperService {
   
   async scanForPapers(
-    topics: string[], 
+    topic: string, 
     sources: string[], 
     datePreset: string, 
     customRange?: { start: string, end: string },
@@ -254,58 +235,68 @@ export class PaperService {
       const d = new Date(); d.setFullYear(d.getFullYear() - 1); fromDate = d.toISOString().split('T')[0];
     }
 
-    // 2. Prepare Search Query Terms (Union Logic)
-    // We want (TopicA Keywords) OR (TopicB Keywords)
-    
-    // First, collect all specific keyword phrases from selected topics
-    let topicPhrases: string[] = [];
-    if (topics.includes('All')) {
-        topicPhrases = []; // Global search, no specific topic limits
-    } else {
-        // Flatten array of arrays
-        topics.forEach(t => {
-            topicPhrases = [...topicPhrases, ...getTopicKeywords(t)];
-        });
+    // 2. Prepare Search Queries
+    // We determine the Topic keywords first, then combine with searchTerm if present.
+    let baseQuery = "";
+    switch(topic) {
+        case 'All': baseQuery = ""; break;
+        case 'QuantFinance': baseQuery = "quantitative finance empirical asset pricing"; break;
+        case 'Momentum': baseQuery = "momentum strategy asset pricing"; break;
+        case 'Crypto': baseQuery = "cryptocurrency bitcoin defi"; break;
+        case 'ML': baseQuery = "machine learning finance neural networks"; break;
+        case 'HFT': baseQuery = "high frequency trading microstructure liquidity"; break;
+        case 'Risk': baseQuery = "risk management value at risk volatility"; break;
+        case 'FixedIncome': baseQuery = "fixed income yield curve bond market"; break;
+        case 'InternationalTax': baseQuery = "international taxation tax avoidance BEPS corporate tax"; break;
+        case 'TransferPricing': baseQuery = "transfer pricing multinational enterprises profit shifting"; break;
+        case 'ValueChain': baseQuery = "global value chain supply chain finance economic value added"; break;
+        case 'Transformation': baseQuery = "digital transformation business model innovation finance automation"; break;
+        default: baseQuery = "quantitative finance asset pricing"; break;
     }
 
-    const cleanSearch = searchTerm ? searchTerm.trim() : "";
-
-    // If we have no topics selected (shouldn't happen due to UI defaults) and no search term, default to "finance"
-    if (topicPhrases.length === 0 && !cleanSearch && !topics.includes('All')) {
-        topicPhrases = ["quantitative finance"];
+    let queryTerm = baseQuery;
+    
+    if (searchTerm && searchTerm.trim()) {
+        const cleanSearch = searchTerm.trim();
+        if (baseQuery) {
+            // Combine Search Term with Topic (e.g., "Momentum" topic + "Tesla" search -> "Tesla momentum strategy...")
+            // We put search term first to prioritize it in relevance
+            queryTerm = `${cleanSearch} ${baseQuery}`;
+        } else {
+            // If topic is All, just use search term
+            queryTerm = cleanSearch;
+        }
     }
 
     const promises = [];
     const useAllSources = sources.length === 0;
 
     // 3. Fetch from arXiv (XML)
+    // Only if arXiv is selected or All sources
     if (useAllSources || sources.includes('arXiv')) {
-      let q = "cat:q-fin.*";
+      // ArXiv: If queryTerm is empty, use catch-all. Otherwise construct query.
+      // We always append cat:q-fin.* to ensure domain relevance.
+      let q = "";
+      if (!queryTerm) {
+         q = "cat:q-fin.*";
+      } else {
+         // ArXiv prefers terms joined by +AND+ or similar. 
+         // For simple free text mixed with category, "all:term+AND+cat:..." works.
+         q = `all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*`;
+      }
       
-      // Construct ArXiv Query: (all:Topic1 OR all:Topic2) AND all:SearchTerm
-      let mainPart = "";
-      
-      if (topicPhrases.length > 0) {
-          // Join topic parts with OR
-          // e.g. all:momentum+OR+all:bitcoin
-          const joinedTopics = topicPhrases.map(t => `all:"${encodeURIComponent(t)}"`).join('+OR+');
-          mainPart = `(${joinedTopics})`;
-      }
-
-      if (cleanSearch) {
-          const searchPart = `all:${encodeURIComponent(cleanSearch)}`;
-          mainPart = mainPart ? `${mainPart}+AND+${searchPart}` : searchPart;
-      }
-
-      if (mainPart) {
-          q = `${mainPart}+AND+cat:q-fin.*`;
-      }
-
       const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=30`;
       
+      // Use a CORS proxy (corsproxy.io) to bypass browser restrictions
+      // allorigins.win can be unstable, so we use corsproxy.io
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(arxivUrl)}`;
+
       promises.push(
-        fetch(arxivUrl)
-          .then(res => res.text())
+        fetch(proxyUrl)
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.text();
+          })
           .then(text => parseArxivXML(text))
           .catch(err => {
             console.error("arXiv fetch error", err);
@@ -314,74 +305,102 @@ export class PaperService {
       );
     }
 
-    // 4. Fetch from OpenAlex (Generic Handler for SSRN, Journals, BIS, etc)
-    // OpenAlex Search Syntax: search=(termA|termB),search=termC (comma is AND, pipe is OR)
-    
-    let openAlexSearchQuery = "";
-    
-    // Build Topic OR part: (TopicA|TopicB)
-    if (topicPhrases.length > 0) {
-        // OpenAlex uses | for OR. 
-        // We use quotes around specific multi-word phrases to be precise.
-        // e.g. "momentum strategy"|"bitcoin"
-        const joined = topicPhrases.map(t => `"${t}"`).join('|'); 
-        openAlexSearchQuery = `default.search:${encodeURIComponent(joined)}`;
-    }
-
-    // Add explicit Search Term (AND)
-    if (cleanSearch) {
-        const part = `default.search:${encodeURIComponent(cleanSearch)}`;
-        openAlexSearchQuery = openAlexSearchQuery ? `${openAlexSearchQuery},${part}` : part;
-    }
-
-    // Helper to push OpenAlex promise
-    const fetchOpenAlex = (sourceFilter: string, sourceLabel: string) => {
-        let filter = `${sourceFilter},from_publication_date:${fromDate}`;
-        if (openAlexSearchQuery) {
-            filter = `${openAlexSearchQuery},${filter}`;
-        }
-        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
-        return fetch(url)
-          .then(res => res.json())
-          .then(data => parseOpenAlexJSON(data, sourceLabel))
-          .catch(err => {
-             console.error(`OpenAlex (${sourceLabel}) fetch error`, err);
-             return [];
-          });
-    };
-
+    // 4. Fetch from OpenAlex (SSRN Specific)
     if (useAllSources || sources.includes('SSRN')) {
-       promises.push(fetchOpenAlex('primary_location.source.display_name:ssrn', 'SSRN'));
-    }
-
-    if (useAllSources || sources.includes('BIS')) {
-       promises.push(fetchOpenAlex('institutions.search:Bank%20for%20International%20Settlements', 'BIS'));
-    }
-
-    if (useAllSources || sources.includes('FED')) {
-       promises.push(fetchOpenAlex('institutions.search:Federal%20Reserve', 'Federal Reserve'));
-    }
-
-    if (useAllSources || sources.includes('BLS')) {
-       promises.push(fetchOpenAlex('institutions.search:Bureau%20of%20Labor%20Statistics', 'BLS'));
-    }
-
-    if (useAllSources || sources.includes('OpenAlex')) {
-       // If no query at all for General Journals, default to "finance" to avoid showing random biology papers
-       let effectiveFilter = openAlexSearchQuery;
-       if (!effectiveFilter) {
-           effectiveFilter = `default.search:finance`;
+       let filter = `primary_location.source.display_name:ssrn,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+         filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        }
-       
-       let filter = `from_publication_date:${fromDate}`;
-       if (effectiveFilter) filter = `${effectiveFilter},${filter}`;
+
+       const ssrnUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+
+       promises.push(
+        fetch(ssrnUrl)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "SSRN"))
+          .catch(err => {
+             console.error("OpenAlex (SSRN) fetch error", err);
+             return [];
+          })
+       );
+    }
+
+    // 5. Fetch BIS (Bank for International Settlements)
+    if (useAllSources || sources.includes('BIS')) {
+       let filter = `institutions.search:Bank%20for%20International%20Settlements,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
        
        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
-           fetch(url)
-           .then(res => res.json())
-           .then(data => parseOpenAlexJSON(data, "OpenAlex Journals"))
-           .catch(() => [])
+        fetch(url)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "BIS"))
+          .catch(err => {
+            console.error("BIS fetch error", err);
+            return [];
+          })
+       );
+    }
+
+    // 6. Fetch Federal Reserve (FED)
+    if (useAllSources || sources.includes('FED')) {
+       let filter = `institutions.search:Federal%20Reserve,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
+
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+       promises.push(
+        fetch(url)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "Federal Reserve"))
+          .catch(err => {
+            console.error("FED fetch error", err);
+            return [];
+          })
+       );
+    }
+
+    // 7. Fetch BLS (Bureau of Labor Statistics)
+    if (useAllSources || sources.includes('BLS')) {
+       let filter = `institutions.search:Bureau%20of%20Labor%20Statistics,from_publication_date:${fromDate}`;
+       if (queryTerm) {
+          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       }
+
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+       promises.push(
+        fetch(url)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "BLS"))
+          .catch(err => {
+            console.error("BLS fetch error", err);
+            return [];
+          })
+       );
+    }
+
+    // 8. Fetch from OpenAlex (General Journals)
+    if (useAllSources || sources.includes('OpenAlex')) {
+       // For general bucket, "All" needs to be bounded to domain to avoid unrelated sciences.
+       // If baseQuery is empty (Topic=All) and NO search term, fallback to "finance economics"
+       let effectiveQuery = queryTerm;
+       if (!effectiveQuery) effectiveQuery = "finance economics";
+
+       const filter = `default.search:${encodeURIComponent(effectiveQuery)},from_publication_date:${fromDate}`;
+       
+       const openAlexUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+
+       promises.push(
+        fetch(openAlexUrl)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "OpenAlex Journals"))
+          .catch(err => {
+             console.error("OpenAlex (General) fetch error", err);
+             return [];
+          })
        );
     }
 
@@ -399,23 +418,26 @@ export class PaperService {
       return true;
     });
 
-    // Client-side date filter (strict) for arXiv results which might return older ones despite sort
+    // Client-side date filter (strict)
+    // 1. Ensure we don't show papers from "tomorrow"
+    const d = new Date();
+    // Get YYYY-MM-DD for today in local time
+    const todayString = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+
     const dateLimit = new Date(fromDate);
     
-    // Construct local "today" string to avoid UTC timezone issues showing "tomorrow's" papers
-    const d = new Date();
-    const today = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
-    
     // Ensure we handle invalid dates gracefully
-    if (!isNaN(dateLimit.getTime())) {
-       allPapers = allPapers.filter(p => {
-         // Exclude future dates (strictly greater than today)
-         if (p.date > today) return false;
-
-         const pDate = new Date(p.date);
-         return !isNaN(pDate.getTime()) && pDate >= dateLimit;
-       });
-    }
+    allPapers = allPapers.filter(p => {
+         // Strict future date check
+         if (p.date > todayString) return false;
+         
+         // Standard filter range check
+         if (!isNaN(dateLimit.getTime())) {
+            const pDate = new Date(p.date);
+            return !isNaN(pDate.getTime()) && pDate >= dateLimit;
+         }
+         return true;
+    });
 
     // Sort by date descending
     allPapers.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
