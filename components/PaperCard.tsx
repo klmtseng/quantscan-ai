@@ -75,20 +75,32 @@ const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
           ))}
         </div>
 
-        <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
              <i className="fas fa-bolt text-[10px]"></i> {paper.relevanceScore}% Match
           </div>
 
-          <a 
-            href={paper.url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center text-xs font-bold text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors z-10 uppercase tracking-wide gap-1.5"
-          >
-            Open Source <i className="fas fa-external-link-alt text-[10px]"></i>
-          </a>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsModalOpen(true);
+              }}
+              className="text-xs font-bold text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors uppercase tracking-wide"
+            >
+              Read Abstract
+            </button>
+
+            <a 
+              href={paper.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors z-10 uppercase tracking-wide gap-1.5"
+            >
+              Source <i className="fas fa-external-link-alt text-[10px]"></i>
+            </a>
+          </div>
         </div>
       </div>
 
