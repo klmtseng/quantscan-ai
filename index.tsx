@@ -5,7 +5,8 @@ import Fuse from 'fuse.js';
 import Header from './components/Header';
 import PaperCard from './components/PaperCard';
 import ContactModal from './components/ContactModal';
-import { geminiService } from './services/geminiService';
+// Switched from geminiService to paperService
+import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
 
@@ -13,20 +14,19 @@ const App: React.FC = () => {
   // Papers state now holds the fetched data
   const [papers, setPapers] = useState<ResearchPaper[]>([]);
   const [activeTopic, setActiveTopic] = useState<ResearchTopic>('All');
-  const [selectedSources, setSelectedSources] = useState<string[]>(DATA_SOURCES.map(s => s.id));
+  const [selectedSources, setSelectedSources] = useState<string[]>([]); // Default empty means "All"
+  // Default to 'Month'
   const [datePreset, setDatePreset] = useState<DateFilterPreset>('Month');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [searchTerm, setSearchTerm] = useState('');
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [customRange, setCustomRange] = useState<DateRange>({
-    start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
+    start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
   
   const [isScanning, setIsScanning] = useState(false);
-  // Track if we have performed the initial load
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
-
+  
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') as 'light' | 'dark' || 'light';
@@ -60,27 +60,30 @@ const App: React.FC = () => {
     });
   };
 
+  const handleTopicChange = (topic: ResearchTopic) => {
+    setActiveTopic(topic);
+    setSearchTerm(''); // Clear search term when switching topics to allow default topic query
+  };
+
   // Perform the actual API scan
   const performScan = async () => {
     if (isScanning) return;
     setIsScanning(true);
     
     try {
-      const result = await geminiService.scanForPapers(
+      const result = await paperService.scanForPapers(
         activeTopic,
         selectedSources,
         datePreset,
-        customRange
+        customRange,
+        searchTerm // Pass searchTerm to service for global API search
       );
       
-      // If we got results, replace the list. If empty, we might want to keep previous or show empty state.
-      // Here we replace to reflect the 'Filter' accurately.
       setPapers(result.papers);
     } catch (error) {
       console.error("Scan failed", error);
     } finally {
       setIsScanning(false);
-      setInitialLoadDone(true);
     }
   };
 
@@ -88,12 +91,9 @@ const App: React.FC = () => {
   useEffect(() => {
     performScan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []); 
 
   // Trigger scan when major "Query" filters change (Topic, Date, Sources)
-  // We debounce this slightly or just run it. Given the cost, we might prefer manual update, 
-  // but to keep the UI responsive to "Filters", we run it.
-  // Using a ref to skip the very first render double-call if strict mode is on
   const isFirstRun = useRef(true);
   useEffect(() => {
     if (isFirstRun.current) {
@@ -111,6 +111,8 @@ const App: React.FC = () => {
     let results = [...papers];
 
     // 1. Text Search (Fuzzy)
+    // We keep client-side Fuse.js even if we searched via API, 
+    // to highlight/rank results effectively.
     if (searchTerm.trim()) {
       const fuse = new Fuse(results, {
         keys: [
@@ -155,6 +157,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 flex flex-col font-sans">
       <Header 
         onScan={performScan} 
+        onSearch={performScan}
         isScanning={isScanning} 
         theme={theme} 
         toggleTheme={toggleTheme}
@@ -175,7 +178,7 @@ const App: React.FC = () => {
                   {TOPICS.map((topic) => (
                     <button
                       key={topic.id}
-                      onClick={() => setActiveTopic(topic.id as ResearchTopic)}
+                      onClick={() => handleTopicChange(topic.id as ResearchTopic)}
                       disabled={isScanning}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border
                         ${activeTopic === topic.id 
@@ -192,7 +195,7 @@ const App: React.FC = () => {
 
               {/* Data Sources */}
               <div>
-                <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Data Sources</h2>
+                <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Data Sources (Active)</h2>
                 <div className="flex flex-wrap gap-2">
                   {DATA_SOURCES.map((source) => {
                     const isSelected = selectedSources.includes(source.id);
@@ -211,21 +214,8 @@ const App: React.FC = () => {
                       </button>
                     );
                   })}
-                  <button
-                    onClick={() => {
-                        if (isScanning) return;
-                        if (selectedSources.length === DATA_SOURCES.length) {
-                            setSelectedSources([]);
-                        } else {
-                            setSelectedSources(DATA_SOURCES.map(s => s.id));
-                        }
-                    }}
-                    disabled={isScanning}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-                  >
-                    {selectedSources.length === DATA_SOURCES.length ? 'Deselect All' : 'Select All'}
-                  </button>
                 </div>
+                <p className="text-[10px] text-slate-400 mt-2">* Note: Academic journals are aggregated via OpenAlex due to CORS restrictions.</p>
               </div>
 
               {/* Filters Row */}
@@ -310,7 +300,7 @@ const App: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm self-start lg:self-auto ml-auto">
               <div className="text-right">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Database</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-200">Gemini Live Search</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-200">Live API Aggregator</p>
               </div>
               <div className="w-px h-8 bg-slate-100 dark:bg-slate-800"></div>
               <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
@@ -319,7 +309,7 @@ const App: React.FC = () => {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
                 <span className="text-sm font-bold tracking-tight">
-                  {isScanning ? 'Scanning Web...' : 'Live'}
+                  {isScanning ? 'Fetching APIs...' : 'Online'}
                 </span>
               </div>
             </div>
@@ -368,8 +358,8 @@ const App: React.FC = () => {
             <button 
               onClick={() => {
                 setDatePreset('Year');
-                setActiveTopic('All');
-                setSelectedSources(DATA_SOURCES.map(s => s.id));
+                handleTopicChange('All');
+                setSelectedSources([]);
                 setSearchTerm('');
                 setSortBy('relevance');
               }}

@@ -25,7 +25,11 @@ export type ResearchTopic =
   | 'ML' 
   | 'HFT' 
   | 'Risk' 
-  | 'FixedIncome';
+  | 'FixedIncome'
+  | 'InternationalTax'
+  | 'TransferPricing'
+  | 'ValueChain'
+  | 'Transformation';
 
 export type DateFilterPreset = 'Week' | 'Month' | 'Quarter' | 'Year' | 'Custom';
 

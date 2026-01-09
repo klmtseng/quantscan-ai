@@ -9,18 +9,17 @@ export const TOPICS = [
   { id: 'HFT', label: 'HFT & Liquidity', icon: <i className="fas fa-bolt"></i> },
   { id: 'Risk', label: 'Risk Mgmt', icon: <i className="fas fa-shield-halved"></i> },
   { id: 'FixedIncome', label: 'Fixed Income', icon: <i className="fas fa-file-invoice-dollar"></i> },
+  { id: 'InternationalTax', label: 'Intl Tax', icon: <i className="fas fa-earth-americas"></i> },
+  { id: 'TransferPricing', label: 'Transfer Pricing', icon: <i className="fas fa-right-left"></i> },
+  { id: 'ValueChain', label: 'Value Chain', icon: <i className="fas fa-link"></i> },
+  { id: 'Transformation', label: 'Transformation', icon: <i className="fas fa-rocket"></i> },
 ];
 
+// Updated to reflect sources that have accessible APIs or are aggregated by OpenAlex
 export const DATA_SOURCES = [
   { id: 'arXiv', label: 'arXiv (q-fin)' },
   { id: 'SSRN', label: 'SSRN' },
-  { id: 'NBER', label: 'NBER' },
-  { id: 'JF', label: 'J. Finance' },
-  { id: 'JFE', label: 'J. Fin. Econ' },
-  { id: 'RFS', label: 'Rev. Fin. Studies' },
-  { id: 'CFA', label: 'CFA Institute' },
-  { id: 'BIS', label: 'BIS' },
-  { id: 'Fed', label: 'Fed Reserve' },
+  { id: 'OpenAlex', label: 'OpenAlex (Journals)' },
 ];
 
 export const DATE_PRESETS = [
@@ -37,5 +36,4 @@ export const SORT_OPTIONS = [
   { id: 'oldest', label: 'Oldest', icon: <i className="fas fa-sort-amount-up"></i> },
 ];
 
-// Initialize with empty array since we are now fetching real data
 export const MOCK_PAPERS = [];
