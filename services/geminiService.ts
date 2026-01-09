@@ -47,7 +47,7 @@ export class GeminiService {
             "id": "generate-a-unique-id",
             "title": "Exact Title of the Paper",
             "authors": ["Author Name"],
-            "abstract": "A brief summary of the paper (1-2 sentences).",
+            "abstract": "Detailed abstract of the paper.",
             "date": "YYYY-MM-DD",
             "source": "Source Name (e.g. arXiv, SSRN, JF)",
             "url": "https://valid-url-to-paper...",
