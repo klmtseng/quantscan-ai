@@ -12,7 +12,6 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ 
-  _onScan,
   onSearch,
   isScanning, 
   theme, 
