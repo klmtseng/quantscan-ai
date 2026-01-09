@@ -186,25 +186,35 @@ export class PaperService {
     }
 
     // 2. Prepare Search Queries
-    // If searchTerm is present, it overrides the Topic preset.
-    let queryTerm = "";
+    // We determine the Topic keywords first, then combine with searchTerm if present.
+    let baseQuery = "";
+    switch(topic) {
+        case 'All': baseQuery = ""; break;
+        case 'Momentum': baseQuery = "momentum strategy asset pricing"; break;
+        case 'Crypto': baseQuery = "cryptocurrency bitcoin defi"; break;
+        case 'ML': baseQuery = "machine learning finance neural networks"; break;
+        case 'HFT': baseQuery = "high frequency trading microstructure liquidity"; break;
+        case 'Risk': baseQuery = "risk management value at risk volatility"; break;
+        case 'FixedIncome': baseQuery = "fixed income yield curve bond market"; break;
+        case 'InternationalTax': baseQuery = "international taxation tax avoidance BEPS corporate tax"; break;
+        case 'TransferPricing': baseQuery = "transfer pricing multinational enterprises profit shifting"; break;
+        case 'ValueChain': baseQuery = "global value chain supply chain finance economic value added"; break;
+        case 'Transformation': baseQuery = "digital transformation business model innovation finance automation"; break;
+        default: baseQuery = "quantitative finance asset pricing"; break;
+    }
+
+    let queryTerm = baseQuery;
+    
     if (searchTerm && searchTerm.trim()) {
-      queryTerm = searchTerm.trim();
-    } else {
-      switch(topic) {
-        case 'All': queryTerm = ""; break; // Explicitly empty for All to capture entire feed from sources
-        case 'Momentum': queryTerm = "momentum strategy asset pricing"; break;
-        case 'Crypto': queryTerm = "cryptocurrency bitcoin defi"; break;
-        case 'ML': queryTerm = "machine learning finance neural networks"; break;
-        case 'HFT': queryTerm = "high frequency trading microstructure liquidity"; break;
-        case 'Risk': queryTerm = "risk management value at risk volatility"; break;
-        case 'FixedIncome': queryTerm = "fixed income yield curve bond market"; break;
-        case 'InternationalTax': queryTerm = "international taxation tax avoidance BEPS corporate tax"; break;
-        case 'TransferPricing': queryTerm = "transfer pricing multinational enterprises profit shifting"; break;
-        case 'ValueChain': queryTerm = "global value chain supply chain finance economic value added"; break;
-        case 'Transformation': queryTerm = "digital transformation business model innovation finance automation"; break;
-        default: queryTerm = "quantitative finance asset pricing"; break;
-      }
+        const cleanSearch = searchTerm.trim();
+        if (baseQuery) {
+            // Combine Search Term with Topic (e.g., "Momentum" topic + "Tesla" search -> "Tesla momentum strategy...")
+            // We put search term first to prioritize it in relevance
+            queryTerm = `${cleanSearch} ${baseQuery}`;
+        } else {
+            // If topic is All, just use search term
+            queryTerm = cleanSearch;
+        }
     }
 
     const promises = [];
@@ -213,8 +223,17 @@ export class PaperService {
     // 3. Fetch from arXiv (XML)
     // Only if arXiv is selected or All sources
     if (useAllSources || sources.includes('arXiv')) {
-      // If queryTerm is empty, just fetch everything in q-fin category
-      const q = queryTerm ? `all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*` : `cat:q-fin.*`;
+      // ArXiv: If queryTerm is empty, use catch-all. Otherwise construct query.
+      // We always append cat:q-fin.* to ensure domain relevance.
+      let q = "";
+      if (!queryTerm) {
+         q = "cat:q-fin.*";
+      } else {
+         // ArXiv prefers terms joined by +AND+ or similar. 
+         // For simple free text mixed with category, "all:term+AND+cat:..." works.
+         q = `all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*`;
+      }
+      
       const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=30`;
       
       promises.push(
@@ -230,8 +249,6 @@ export class PaperService {
 
     // 4. Fetch from OpenAlex (SSRN Specific)
     if (useAllSources || sources.includes('SSRN')) {
-       // If queryTerm is empty, we don't apply search filter, just source and date.
-       // Note: This might return non-finance papers if they are on SSRN, but satisfies "All Research" request.
        let filter = `primary_location.source.display_name:ssrn,from_publication_date:${fromDate}`;
        if (queryTerm) {
          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
@@ -310,8 +327,10 @@ export class PaperService {
     // 8. Fetch from OpenAlex (General Journals)
     if (useAllSources || sources.includes('OpenAlex')) {
        // For general bucket, "All" needs to be bounded to domain to avoid unrelated sciences.
-       // We use "finance economics" as a safe fallback if query is empty.
-       const effectiveQuery = queryTerm || "finance economics";
+       // If baseQuery is empty (Topic=All) and NO search term, fallback to "finance economics"
+       let effectiveQuery = queryTerm;
+       if (!effectiveQuery) effectiveQuery = "finance economics";
+
        const filter = `default.search:${encodeURIComponent(effectiveQuery)},from_publication_date:${fromDate}`;
        
        const openAlexUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
