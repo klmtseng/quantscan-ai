@@ -1,6 +1,3 @@
-
-import React from 'react';
-
 export const TOPICS = [
   { id: 'All', label: 'All Research', icon: <i className="fas fa-globe"></i> },
   { id: 'QuantFinance', label: 'Quant Finance', icon: <i className="fas fa-calculator"></i> },
