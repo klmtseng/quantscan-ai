@@ -40,6 +40,7 @@ const generateTags = (title: string, abstract: string): string[] => {
   if (text.includes('tax') || text.includes('beps')) tags.add('Tax');
   if (text.includes('transfer pricing')) tags.add('Transfer Pricing');
   if (text.includes('supply chain') || text.includes('value chain')) tags.add('Value Chain');
+  if (text.includes('labor') || text.includes('employment') || text.includes('wage')) tags.add('Labor');
 
   // Default fallback if really nothing matches
   if (tags.size === 0) {
@@ -110,10 +111,12 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
   return validResults.map((work: any) => {
     let sourceName = work.primary_location?.source?.display_name || defaultSourceLabel;
     
-    // Normalize SSRN name
-    if (sourceName && sourceName.toLowerCase().includes('ssrn')) {
-      sourceName = "SSRN";
-    }
+    // Normalize source names
+    if (sourceName && sourceName.toLowerCase().includes('ssrn')) sourceName = "SSRN";
+    // For Fed/BIS/BLS, often the source is generic "Working Paper", so we prefer the default label if provided and relevant
+    if (defaultSourceLabel === "BIS" && !sourceName.toLowerCase().includes('bis')) sourceName = "BIS Working Papers";
+    if (defaultSourceLabel === "Federal Reserve" && !sourceName.toLowerCase().includes('federal reserve')) sourceName = "Federal Reserve";
+    if (defaultSourceLabel === "BLS" && !sourceName.toLowerCase().includes('labor statistics')) sourceName = "BLS";
 
     // Handle missing authors
     const authors = work.authorships && work.authorships.length > 0
@@ -209,7 +212,6 @@ export class PaperService {
     // 3. Fetch from arXiv (XML)
     // Only if arXiv is selected or All sources
     if (useAllSources || sources.includes('arXiv')) {
-      // Increased max_results to 30 to better handle date filtering
       const arxivUrl = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*&sortBy=submittedDate&sortOrder=descending&max_results=30`;
       
       promises.push(
@@ -224,11 +226,7 @@ export class PaperService {
     }
 
     // 4. Fetch from OpenAlex (SSRN Specific)
-    // Use OpenAlex to proxy SSRN searches since SSRN has no public CORS API.
-    // Query specifically for "SSRN" in the venue name.
     if (useAllSources || sources.includes('SSRN')) {
-       // Filter by primary_location.source.display_name:SSRN
-       // Increased per_page to 30
        const ssrnUrl = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},primary_location.source.display_name:ssrn,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
 
        promises.push(
@@ -242,11 +240,51 @@ export class PaperService {
        );
     }
 
-    // 5. Fetch from OpenAlex (General Journals)
-    // Exclude SSRN to avoid duplicates if possible, or just accept them.
-    // Ideally we filter out SSRN here if we fetched it above, but keeping it simple is fine as we dedup later.
+    // 5. Fetch BIS (Bank for International Settlements)
+    if (useAllSources || sources.includes('BIS')) {
+       const url = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},institutions.search:Bank%20for%20International%20Settlements,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       promises.push(
+        fetch(url)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "BIS"))
+          .catch(err => {
+            console.error("BIS fetch error", err);
+            return [];
+          })
+       );
+    }
+
+    // 6. Fetch Federal Reserve (FED)
+    if (useAllSources || sources.includes('FED')) {
+       // Using 'Federal Reserve' in institution search captures the system
+       const url = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},institutions.search:Federal%20Reserve,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       promises.push(
+        fetch(url)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "Federal Reserve"))
+          .catch(err => {
+            console.error("FED fetch error", err);
+            return [];
+          })
+       );
+    }
+
+    // 7. Fetch BLS (Bureau of Labor Statistics)
+    if (useAllSources || sources.includes('BLS')) {
+       const url = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},institutions.search:Bureau%20of%20Labor%20Statistics,from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
+       promises.push(
+        fetch(url)
+          .then(res => res.json())
+          .then(data => parseOpenAlexJSON(data, "BLS"))
+          .catch(err => {
+            console.error("BLS fetch error", err);
+            return [];
+          })
+       );
+    }
+
+    // 8. Fetch from OpenAlex (General Journals)
     if (useAllSources || sources.includes('OpenAlex')) {
-       // Increased per_page to 30
        const openAlexUrl = `https://api.openalex.org/works?filter=default.search:${encodeURIComponent(queryTerm)},from_publication_date:${fromDate}&sort=publication_date:desc&per_page=30`;
 
        promises.push(
@@ -260,7 +298,7 @@ export class PaperService {
        );
     }
 
-    // 6. Aggregate and Sort
+    // 9. Aggregate and Sort
     const results = await Promise.all(promises);
     let allPapers = results.flat();
 
