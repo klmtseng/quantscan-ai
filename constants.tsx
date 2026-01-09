@@ -20,6 +20,9 @@ export const DATA_SOURCES = [
   { id: 'arXiv', label: 'arXiv (q-fin)' },
   { id: 'SSRN', label: 'SSRN' },
   { id: 'OpenAlex', label: 'OpenAlex (Journals)' },
+  { id: 'BIS', label: 'BIS' },
+  { id: 'FED', label: 'Fed / FRED' },
+  { id: 'BLS', label: 'BLS' },
 ];
 
 export const DATE_PRESETS = [
