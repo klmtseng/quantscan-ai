@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "noUnusedLocals": false,      // 關閉檢查未使用的變數
+    "noUnusedParameters": false,  // 關閉檢查未使用的參數
     "target": "ES2022",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
