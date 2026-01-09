@@ -1,4 +1,5 @@
-# QuantScan AI - Financial Research Scanner
+
+# QuantScan - Financial Research Scanner
 
 QuantScan is a modern, responsive web application designed for quantitative finance researchers. It aggregates and filters research papers related to Momentum strategies, Cryptocurrency, Machine Learning, and High-Frequency Trading (HFT).
 
@@ -12,16 +13,15 @@ QuantScan is a modern, responsive web application designed for quantitative fina
 - **Dark Mode**: Fully responsive dark/light theme toggle.
 - **Modern UI**: Built with Tailwind CSS and React for a clean, glassmorphic aesthetic.
 - **Contact Integration**: specific modal for user feedback.
+- **Direct Data Aggregation**: Fetches data directly from arXiv and OpenAlex APIs.
 
 ## Tech Stack
 
-- **Frontend**: React 19 (ES Modules), Tailwind CSS
-- **AI Integration**: Prepared for Google Gemini API (`@google/genai`)
-- **Build System**: No-build setup using ES Modules and `esm.sh` CDN.
+- **Frontend**: React 18, TypeScript, Tailwind CSS
+- **Build Tool**: Vite
+- **Data Sources**: arXiv API, OpenAlex API
 
 ## Getting Started
-
-Since this project uses modern ES Modules via CDN, you don't need `npm install`.
 
 1. **Clone the repository**
    ```bash
@@ -29,27 +29,19 @@ Since this project uses modern ES Modules via CDN, you don't need `npm install`.
    cd quantscan-ai
    ```
 
-2. **Serve the application**
-   You need a simple static file server to run the app (to handle ES module imports correctly).
-
-   If you have Python installed:
+2. **Install Dependencies**
+   Make sure you have [Node.js](https://nodejs.org/) installed.
    ```bash
-   python3 -m http.server 8000
-   ```
-   Or if you use Node.js:
-   ```bash
-   npx serve .
+   npm install
    ```
 
-3. **Open in Browser**
-   Navigate to `http://localhost:8000`
+3. **Run the Development Server**
+   ```bash
+   npm run dev
+   ```
 
-## Configuration
-
-The application is set up to use the Google Gemini API. To enable live scanning:
-
-1. Ensure you have a valid API Key from Google AI Studio.
-2. The application expects the key to be injected via `process.env.API_KEY` or configured in `services/geminiService.ts`.
+4. **Open in Browser**
+   Click the link provided in the terminal (usually `http://localhost:5173`).
 
 ## License
 
