@@ -11,7 +11,7 @@ import NewsModal from './components/NewsModal';
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
-import MessageBoard from './components/MessageBoard';
+import {MessageBoard } from './components/MessageBoard';
 
 const App: React.FC = () => {
   // Papers state now holds the fetched data
