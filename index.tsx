@@ -177,7 +177,6 @@ const App: React.FC = () => {
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <Header 
-          onScan={performScan} 
           onSearch={performScan}
           isScanning={isScanning} 
           theme={theme} 
