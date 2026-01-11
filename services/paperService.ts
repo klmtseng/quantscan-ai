@@ -2,7 +2,7 @@
 import { ResearchPaper } from "../types";
 
 // Helper to calculate a dynamic relevance score
-const calculateRelevance = (title: string, abstract: string, date: string, tags: string[]): number => {
+const calculateRelevance = (title: string, abstract: string, date: string, tags: string[], citations: number = 0): number => {
   let score = 65; // Base score
 
   const text = (title + " " + abstract).toLowerCase();
@@ -27,11 +27,17 @@ const calculateRelevance = (title: string, abstract: string, date: string, tags:
     // Ignore date parsing errors
   }
 
-  // 3. High Value Keywords (Scoring Boost)
+  // 3. High Value Keywords (Standard Boost)
   const highValueKeywords = [
-    'momentum', 'alpha', 'arbitrage', 'neural network', 'transformer', 
+    'momentum', 'alpha', 'arbitrage', 
     'liquidity', 'high frequency', 'microstructure', 'portfolio optimization',
     'asset pricing', 'volatility', 'predicting', 'forecasting'
+  ];
+
+  // 3b. "Viral" Keywords (Mega Boost for Hot Topics)
+  const viralKeywords = [
+    'large language model', 'llm', 'chatgpt', 'generative ai', 'transformer',
+    'reinforcement learning', 'deep learning', 'crash risk', 'bubble'
   ];
 
   highValueKeywords.forEach(k => {
@@ -39,7 +45,18 @@ const calculateRelevance = (title: string, abstract: string, date: string, tags:
     else if (text.includes(k)) score += 2; // Abstract match
   });
 
-  // 4. Abstract Quality (Proxy)
+  viralKeywords.forEach(k => {
+    if (titleText.includes(k)) score += 10; // Massive boost for viral topics
+    else if (text.includes(k)) score += 5;
+  });
+
+  // 4. Citation Boost (Impact Signal)
+  // Even 1 citation for a recent paper is significant
+  if (citations > 0) {
+      score += Math.min(15, citations * 2); 
+  }
+
+  // 5. Abstract Quality (Proxy)
   if (abstract.length > 500) score += 3;
   if (abstract.length < 50) score -= 10; // Penalty for missing/short abstract
 
@@ -69,8 +86,8 @@ const generateTags = (title: string, abstract: string): string[] => {
   if (text.includes('carry')) tags.add('Carry');
   
   // Methodology & Technology
-  if (text.includes('machine learning') || text.includes('neural network') || text.includes('deep learning') || text.includes('reinforcement learning') || text.includes('lstm') || text.includes('transformer')) tags.add('ML/AI');
-  if (text.includes('nlp') || text.includes('sentiment') || text.includes('textual') || text.includes('llm') || text.includes('language model')) tags.add('NLP');
+  if (text.includes('machine learning') || text.includes('neural network') || text.includes('deep learning') || text.includes('reinforcement learning') || text.includes('lstm') || text.includes('transformer') || text.includes('llm') || text.includes('generative')) tags.add('ML/AI');
+  if (text.includes('nlp') || text.includes('sentiment') || text.includes('textual') || text.includes('language model')) tags.add('NLP');
   if (text.includes('high frequency') || text.includes('hft') || text.includes('microstructure') || text.includes('order book') || text.includes('limit order')) tags.add('HFT');
   if (text.includes('statistical') || text.includes('econometric')) tags.add('Stats');
 
@@ -120,8 +137,11 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
     const tags = generateTags(title, summary);
     if (tags.length === 0) tags.push("Pre-print");
     
+    // arXiv doesn't provide citation counts in the free API
+    const citations = 0;
+    
     // Calculate Score
-    const score = calculateRelevance(title, summary, published.split("T")[0], tags);
+    const score = calculateRelevance(title, summary, published.split("T")[0], tags, citations);
 
     return {
       id,
@@ -132,7 +152,8 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
       source: "arXiv (q-fin)",
       url: link,
       tags: tags,
-      relevanceScore: score
+      relevanceScore: score,
+      citationCount: 0
     };
   });
 };
@@ -170,6 +191,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
     if (defaultSourceLabel === "BIS" && !sourceName.toLowerCase().includes('bis')) sourceName = "BIS Working Papers";
     if (defaultSourceLabel === "Federal Reserve" && !sourceName.toLowerCase().includes('federal reserve')) sourceName = "Federal Reserve";
     if (defaultSourceLabel === "BLS" && !sourceName.toLowerCase().includes('labor statistics')) sourceName = "BLS";
+    if (defaultSourceLabel === "NBER" && !sourceName.toLowerCase().includes('nber')) sourceName = "NBER Working Papers";
     
     // For ResearchGate proxy, if the real source is not useful or is generic, stick to the default label
     if (defaultSourceLabel === "ResearchGate (OA)" && (!sourceName || sourceName === "OpenAlex")) {
@@ -189,8 +211,11 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
     const tags = generateTags(work.title, abstract);
     if (tags.length === 0) tags.push("Research");
     
+    // Extract Citation Count
+    const citations = work.cited_by_count || 0;
+
     // Calculate Score
-    const score = calculateRelevance(work.title, abstract, work.publication_date, tags);
+    const score = calculateRelevance(work.title, abstract, work.publication_date, tags, citations);
 
     return {
       id: work.id,
@@ -201,7 +226,8 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
       source: sourceName || "OpenAlex",
       url: work.doi || work.primary_location?.landing_page_url || "",
       tags: tags,
-      relevanceScore: score
+      relevanceScore: score,
+      citationCount: citations
     };
   });
 };
@@ -383,6 +409,28 @@ export class PaperService {
            .then(data => parseOpenAlexJSON(data, "J. Banking & Finance"))
            .catch(err => {
               console.error("JBF fetch error", err);
+              return [];
+           })
+        );
+    }
+
+    // Fetch from NBER (National Bureau of Economic Research)
+    if (useAllSources || sources.includes('NBER')) {
+        let effectiveQuery = queryTerm;
+        let filter = `institutions.search:National%20Bureau%20of%20Economic%20Research,from_publication_date:${fromDate}`;
+        
+        if (effectiveQuery) {
+           filter = `default.search:${encodeURIComponent(effectiveQuery)},${filter}`;
+        }
+ 
+        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
+ 
+        promises.push(
+         fetch(url)
+           .then(res => res.json())
+           .then(data => parseOpenAlexJSON(data, "NBER"))
+           .catch(err => {
+              console.error("NBER fetch error", err);
               return [];
            })
         );
