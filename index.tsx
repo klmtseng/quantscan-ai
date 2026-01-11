@@ -7,6 +7,7 @@ import PaperCard from './components/PaperCard';
 import PaperListItem from './components/PaperListItem';
 import ContactModal from './components/ContactModal';
 import NewsModal from './components/NewsModal';
+import TrendingSection from './components/TrendingSection';
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
@@ -22,7 +23,8 @@ const App: React.FC = () => {
   // Default to 'Month'
   const [datePreset, setDatePreset] = useState<DateFilterPreset>('Month');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // CHANGED: Default view mode is now 'list'
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isNewsOpen, setIsNewsOpen] = useState(false);
@@ -162,6 +164,15 @@ const App: React.FC = () => {
     });
   }, [papers, searchTerm, sortBy]);
 
+  // Derived state for trending papers (Top 3 by relevance, regardless of sort)
+  const trendingPapers = useMemo(() => {
+    if (isScanning || papers.length === 0) return [];
+    // Clone and sort strictly by relevance score
+    return [...papers]
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 3);
+  }, [papers, isScanning]);
+
   const handleDateSortToggle = () => {
     if (sortBy === 'newest') {
       setSortBy('oldest');
@@ -186,7 +197,7 @@ const App: React.FC = () => {
         />
 
         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-          <div className="flex flex-col gap-8 mb-10">
+          <div className="flex flex-col gap-8 mb-6">
             {/* Main Controls Section */}
             {/* Removed the split flex row layout (lg:flex-row) to remove the sidebar widget */}
             <div className="flex flex-col gap-6 w-full">
@@ -351,6 +362,11 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Trending Section - displayed when data exists and not searching specifically (to keep search focused) */}
+          {!isScanning && trendingPapers.length > 0 && !searchTerm && (
+            <TrendingSection papers={trendingPapers} />
+          )}
+
           {/* Papers Grid/List */}
           {isScanning ? (
             <div className={`gap-6 ${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col'}`}>
@@ -427,7 +443,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-lg font-bold text-white leading-none">QuantScan</span>
-                  <span className="text-[10px] font-mono text-slate-400 mt-1">v1.1.0</span>
+                  <span className="text-[10px] font-mono text-slate-400 mt-1">v1.2.0</span>
                 </div>
               </div>
               <div className="flex gap-8 text-sm font-medium">

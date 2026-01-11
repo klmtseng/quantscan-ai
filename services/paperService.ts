@@ -160,12 +160,16 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
   return validResults.map((work: any) => {
     let sourceName = work.primary_location?.source?.display_name || defaultSourceLabel;
     
-    // Normalize source names
-    if (sourceName && sourceName.toLowerCase().includes('ssrn')) sourceName = "SSRN";
-    // For Fed/BIS/BLS, often the source is generic "Working Paper", so we prefer the default label if provided and relevant
-    if (defaultSourceLabel === "BIS" && !sourceName.toLowerCase().includes('bis')) sourceName = "BIS Working Papers";
-    if (defaultSourceLabel === "Federal Reserve" && !sourceName.toLowerCase().includes('federal reserve')) sourceName = "Federal Reserve";
-    if (defaultSourceLabel === "BLS" && !sourceName.toLowerCase().includes('labor statistics')) sourceName = "BLS";
+    // Normalize source names for UI cleanliness
+    const sLower = sourceName ? sourceName.toLowerCase() : "";
+
+    if (sLower.includes('ssrn')) sourceName = "SSRN";
+    else if (sLower.includes('national bureau of economic research') || defaultSourceLabel === "NBER") sourceName = "NBER";
+    else if (sLower.includes('international monetary fund') || defaultSourceLabel === "IMF") sourceName = "IMF";
+    else if (sLower.includes('world bank') || defaultSourceLabel === "World Bank") sourceName = "World Bank";
+    else if (defaultSourceLabel === "BIS" && !sLower.includes('bis')) sourceName = "BIS";
+    else if (defaultSourceLabel === "Federal Reserve" && !sLower.includes('federal reserve')) sourceName = "Federal Reserve";
+    else if (defaultSourceLabel === "BLS" && !sLower.includes('labor statistics')) sourceName = "BLS";
 
     // Handle missing authors with safe chaining
     const authors = work.authorships && work.authorships.length > 0
@@ -274,23 +278,15 @@ export class PaperService {
     const useAllSources = sources.length === 0;
 
     // 3. Fetch from arXiv (XML)
-    // Only if arXiv is selected or All sources
     if (useAllSources || sources.includes('arXiv')) {
-      // ArXiv: If queryTerm is empty, use catch-all. Otherwise construct query.
-      // We always append cat:q-fin.* to ensure domain relevance.
       let q = "";
       if (!queryTerm) {
          q = "cat:q-fin.*";
       } else {
-         // ArXiv prefers terms joined by +AND+ or similar. 
-         // For simple free text mixed with category, "all:term+AND+cat:..." works.
          q = `all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*`;
       }
       
       const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=30`;
-      
-      // Use a CORS proxy (corsproxy.io) to bypass browser restrictions
-      // allorigins.win can be unstable, so we use corsproxy.io
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(arxivUrl)}`;
 
       promises.push(
@@ -307,15 +303,13 @@ export class PaperService {
       );
     }
 
-    // 4. Fetch from OpenAlex (SSRN Specific)
+    // 4. Fetch from OpenAlex (SSRN)
     if (useAllSources || sources.includes('SSRN')) {
        let filter = `primary_location.source.display_name:ssrn,from_publication_date:${fromDate}`;
        if (queryTerm) {
          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        }
-
        const ssrnUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
-
        promises.push(
         fetch(ssrnUrl)
           .then(res => res.json())
@@ -327,93 +321,67 @@ export class PaperService {
        );
     }
 
-    // 5. Fetch BIS (Bank for International Settlements)
+    // 5. NBER (New)
+    if (useAllSources || sources.includes('NBER')) {
+       let filter = `institutions.search:National%20Bureau%20of%20Economic%20Research,from_publication_date:${fromDate}`;
+       if (queryTerm) filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+       promises.push(fetch(url).then(res => res.json()).then(data => parseOpenAlexJSON(data, "NBER")).catch(() => []));
+    }
+
+    // 6. World Bank (New)
+    if (useAllSources || sources.includes('WorldBank')) {
+       let filter = `institutions.search:World%20Bank,from_publication_date:${fromDate}`;
+       if (queryTerm) filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+       promises.push(fetch(url).then(res => res.json()).then(data => parseOpenAlexJSON(data, "World Bank")).catch(() => []));
+    }
+
+    // 7. IMF (New)
+    if (useAllSources || sources.includes('IMF')) {
+       let filter = `institutions.search:International%20Monetary%20Fund,from_publication_date:${fromDate}`;
+       if (queryTerm) filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
+       
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
+       promises.push(fetch(url).then(res => res.json()).then(data => parseOpenAlexJSON(data, "IMF")).catch(() => []));
+    }
+
+    // 8. BIS
     if (useAllSources || sources.includes('BIS')) {
        let filter = `institutions.search:Bank%20for%20International%20Settlements,from_publication_date:${fromDate}`;
-       if (queryTerm) {
-          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
-       }
-       
+       if (queryTerm) filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
-       promises.push(
-        fetch(url)
-          .then(res => res.json())
-          .then(data => parseOpenAlexJSON(data, "BIS"))
-          .catch(err => {
-            console.error("BIS fetch error", err);
-            return [];
-          })
-       );
+       promises.push(fetch(url).then(res => res.json()).then(data => parseOpenAlexJSON(data, "BIS")).catch(() => []));
     }
 
-    // 6. Fetch Federal Reserve (FED)
+    // 9. FED
     if (useAllSources || sources.includes('FED')) {
        let filter = `institutions.search:Federal%20Reserve,from_publication_date:${fromDate}`;
-       if (queryTerm) {
-          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
-       }
-
+       if (queryTerm) filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
-       promises.push(
-        fetch(url)
-          .then(res => res.json())
-          .then(data => parseOpenAlexJSON(data, "Federal Reserve"))
-          .catch(err => {
-            console.error("FED fetch error", err);
-            return [];
-          })
-       );
+       promises.push(fetch(url).then(res => res.json()).then(data => parseOpenAlexJSON(data, "Federal Reserve")).catch(() => []));
     }
 
-    // 7. Fetch BLS (Bureau of Labor Statistics)
-    if (useAllSources || sources.includes('BLS')) {
-       let filter = `institutions.search:Bureau%20of%20Labor%20Statistics,from_publication_date:${fromDate}`;
-       if (queryTerm) {
-          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
-       }
-
-       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
-       promises.push(
-        fetch(url)
-          .then(res => res.json())
-          .then(data => parseOpenAlexJSON(data, "BLS"))
-          .catch(err => {
-            console.error("BLS fetch error", err);
-            return [];
-          })
-       );
-    }
-
-    // 8. Fetch from OpenAlex (General Journals)
+    // 10. OpenAlex (Journals)
     if (useAllSources || sources.includes('OpenAlex')) {
-       // For general bucket, "All" needs to be bounded to domain to avoid unrelated sciences.
-       // If baseQuery is empty (Topic=All) and NO search term, fallback to "finance economics"
        let effectiveQuery = queryTerm;
        if (!effectiveQuery) effectiveQuery = "finance economics";
-
        const filter = `default.search:${encodeURIComponent(effectiveQuery)},from_publication_date:${fromDate}`;
-       
        const openAlexUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
-
        promises.push(
-        fetch(openAlexUrl)
-          .then(res => res.json())
-          .then(data => parseOpenAlexJSON(data, "OpenAlex Journals"))
-          .catch(err => {
-             console.error("OpenAlex (General) fetch error", err);
-             return [];
-          })
+        fetch(openAlexUrl).then(res => res.json()).then(data => parseOpenAlexJSON(data, "OpenAlex Journals")).catch(() => [])
        );
     }
 
-    // 9. Aggregate and Sort
+    // 11. Aggregate and Sort
     const results = await Promise.all(promises);
     let allPapers = results.flat();
 
-    // Remove duplicates based on title similarity
+    // Remove duplicates
     const seen = new Set();
     allPapers = allPapers.filter(p => {
-      // Normalize title for key: lowercase, alphanumeric only
       const key = p.title.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 30);
       if (seen.has(key)) return false;
       seen.add(key);
@@ -421,19 +389,12 @@ export class PaperService {
     });
 
     // Client-side date filter (strict)
-    // 1. Ensure we don't show papers from "tomorrow"
     const d = new Date();
-    // Get YYYY-MM-DD for today in local time
     const todayString = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
-
     const dateLimit = new Date(fromDate);
     
-    // Ensure we handle invalid dates gracefully
     allPapers = allPapers.filter(p => {
-         // Strict future date check
          if (p.date > todayString) return false;
-         
-         // Standard filter range check
          if (!isNaN(dateLimit.getTime())) {
             const pDate = new Date(p.date);
             return !isNaN(pDate.getTime()) && pDate >= dateLimit;
@@ -441,11 +402,9 @@ export class PaperService {
          return true;
     });
 
-    // Sort by date descending
     allPapers.sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
-        // Safe sort handling invalid dates to the bottom
         if (isNaN(dateA)) return 1;
         if (isNaN(dateB)) return -1;
         return dateB - dateA;

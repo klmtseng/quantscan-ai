@@ -1,4 +1,6 @@
 
+import React from 'react';
+
 export const TOPICS = [
   { id: 'All', label: 'All Research', icon: <i className="fas fa-globe"></i> },
   { id: 'QuantFinance', label: 'Quant Finance', icon: <i className="fas fa-calculator"></i> },
@@ -18,10 +20,12 @@ export const TOPICS = [
 export const DATA_SOURCES = [
   { id: 'arXiv', label: 'arXiv (q-fin)' },
   { id: 'SSRN', label: 'SSRN' },
-  { id: 'OpenAlex', label: 'OpenAlex (Journals)' },
+  { id: 'NBER', label: 'NBER' },
+  { id: 'WorldBank', label: 'World Bank' },
+  { id: 'IMF', label: 'IMF' },
   { id: 'BIS', label: 'BIS' },
   { id: 'FED', label: 'Fed / FRED' },
-  { id: 'BLS', label: 'BLS' },
+  { id: 'OpenAlex', label: 'Journals (OpenAlex)' },
 ];
 
 export const DATE_PRESETS = [
