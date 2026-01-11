@@ -39,12 +39,12 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose }) => {
             {/* Announcement 1 */}
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">Feature</span>
-                    <span className="text-[10px] text-slate-400">v1.1.0</span>
+                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded">New</span>
+                    <span className="text-[10px] text-slate-400">v1.2.0</span>
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">New Quant Finance Category</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Trending Research & List View</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    We've added a dedicated "Quant Finance" topic. This is now the default view, filtering specifically for empirical asset pricing and quantitative strategy papers.
+                    We've introduced a "Trending Research" section to highlight top-rated papers based on relevance. The interface now defaults to a streamlined List View for faster scanning.
                 </p>
             </div>
 
@@ -52,11 +52,11 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose }) => {
              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-2">
                     <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">Data</span>
-                    <span className="text-[10px] text-slate-400">Sources</span>
+                    <span className="text-[10px] text-slate-400">Expansion</span>
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Expanded Source Coverage</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">NBER, IMF & World Bank</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    Our scanner now connects directly to the arXiv (q-fin) API and aggregates working papers from the BIS and Federal Reserve via OpenAlex.
+                    Coverage has been significantly expanded. You can now access working papers and economic reports directly from the NBER, International Monetary Fund (IMF), and World Bank.
                 </p>
             </div>
           </div>
