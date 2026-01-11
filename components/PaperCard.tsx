@@ -12,8 +12,7 @@ const getSourceColor = (source: string) => {
   if (s.includes('arxiv')) return 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/50';
   if (s.includes('ssrn')) return 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50';
   if (s.includes('nber')) return 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50';
-  if (s.includes('researchgate')) return 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-900/50';
-  if (s.includes('jf') || s.includes('jfe') || s.includes('rfs') || s.includes('journal') || s.includes('elsevier') || s.includes('sciencedirect') || s.includes('banking and finance')) 
+  if (s.includes('jf') || s.includes('jfe') || s.includes('rfs') || s.includes('journal')) 
     return 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50';
   if (s.includes('cfa') || s.includes('bis') || s.includes('fed') || s.includes('bls') || s.includes('labor')) 
     return 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50';

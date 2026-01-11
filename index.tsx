@@ -7,7 +7,6 @@ import PaperCard from './components/PaperCard';
 import PaperListItem from './components/PaperListItem';
 import ContactModal from './components/ContactModal';
 import NewsModal from './components/NewsModal';
-// Switched from geminiService to paperService
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
@@ -31,10 +30,6 @@ const App: React.FC = () => {
     start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
-  
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   const [isScanning, setIsScanning] = useState(false);
   const [visitCount, setVisitCount] = useState<number>(0);
@@ -67,11 +62,6 @@ const App: React.FC = () => {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
-
-  // Reset pagination when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTopic, datePreset, selectedSources, customRange, searchTerm, itemsPerPage, sortBy]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -171,89 +161,6 @@ const App: React.FC = () => {
       return 0;
     });
   }, [papers, searchTerm, sortBy]);
-
-  // Derived Trending Papers: Smart Curator Logic
-  const trendingPapers = useMemo(() => {
-     // Helper to get papers within N days
-     const getPapersWithinDays = (days: number) => {
-        const dateLimit = new Date();
-        dateLimit.setDate(dateLimit.getDate() - days);
-        const dateStr = dateLimit.toISOString().split('T')[0];
-        return papers.filter(p => p.date >= dateStr);
-     };
-
-     // 1. Try finding papers from the last 7 days
-     let pool = getPapersWithinDays(7);
-     let label = "Trending this Week";
-
-     // 2. Fallback: If less than 3 papers, extend to 30 days
-     if (pool.length < 3) {
-        pool = getPapersWithinDays(30);
-        label = "Trending this Month";
-     }
-     
-     // 3. Fallback: If still less than 3, just use all papers
-     if (pool.length < 3) {
-        pool = [...papers];
-        label = "Top Rated";
-     }
-
-     // 4. Sort by Impact Score (Relevance + Citation Boost)
-     // We weigh citations heavily because they are the user's proxy for "Views/Popularity"
-     const sorted = pool.sort((a, b) => {
-        const scoreA = a.relevanceScore + ((a.citationCount || 0) * 10);
-        const scoreB = b.relevanceScore + ((b.citationCount || 0) * 10);
-        return scoreB - scoreA;
-     });
-
-     // 5. Select Top 3 with Source Diversity
-     // We try to pick the top 3, but if #2 has the same source as #1, we look for a different source if available within the top 10.
-     const finalSelection: ResearchPaper[] = [];
-     const usedSources = new Set<string>();
-
-     if (sorted.length > 0) {
-        finalSelection.push(sorted[0]);
-        usedSources.add(sorted[0].source);
-     }
-
-     // Attempt to fill spots 2 and 3 with diverse sources
-     for (let i = 1; i < sorted.length && finalSelection.length < 3; i++) {
-        const p = sorted[i];
-        // If source not used, or if we ran out of diverse options (i > 5), just add it
-        if (!usedSources.has(p.source) || i > 5) {
-           finalSelection.push(p);
-           usedSources.add(p.source);
-        }
-     }
-
-     // Fill remaining spots if diversity check skipped some
-     if (finalSelection.length < 3) {
-         for (let i = 1; i < sorted.length && finalSelection.length < 3; i++) {
-             if (!finalSelection.find(sel => sel.id === sorted[i].id)) {
-                 finalSelection.push(sorted[i]);
-             }
-         }
-     }
-
-     return { papers: finalSelection, label };
-  }, [papers]);
-
-
-  // Pagination Logic
-  const totalItems = processedPapers.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  
-  const paginatedPapers = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return processedPapers.slice(startIndex, startIndex + itemsPerPage);
-  }, [processedPapers, currentPage, itemsPerPage]);
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
 
   const handleDateSortToggle = () => {
     if (sortBy === 'newest') {
@@ -445,87 +352,10 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Weekly Highlights Section - Only shows if there are trending papers */}
-          {!isScanning && trendingPapers.papers.length > 0 && (
-             <div className="mb-10 animate-fade-in">
-                <div className="flex items-center gap-3 mb-4 pl-1">
-                   <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                      <i className="fas fa-fire text-orange-600 dark:text-orange-500 text-lg"></i>
-                   </div>
-                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Weekly Highlights</h2>
-                   <span className="text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 px-2 py-0.5 rounded-md">
-                      {trendingPapers.label}
-                   </span>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                   {trendingPapers.papers.map(paper => (
-                      <div key={`trend-${paper.id}`} className="relative bg-gradient-to-br from-white to-orange-50/30 dark:from-slate-900 dark:to-orange-900/10 border border-orange-200/50 dark:border-orange-900/30 rounded-2xl p-5 hover:shadow-lg transition-all duration-300">
-                         <div className="absolute top-4 right-4 text-orange-500/20 dark:text-orange-500/10 text-6xl font-black -z-10 pointer-events-none">
-                            <i className="fas fa-fire"></i>
-                         </div>
-                         <div className="flex justify-between items-start mb-2">
-                             <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 bg-white/80 dark:bg-black/50 px-2 py-1 rounded shadow-sm backdrop-blur-sm">
-                                {paper.source}
-                             </span>
-                             <span className="text-[10px] font-mono text-slate-400">{paper.date}</span>
-                         </div>
-                         <h3 className="font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2" title={paper.title}>
-                            {paper.title}
-                         </h3>
-                         <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
-                            {paper.abstract}
-                         </p>
-                         <div className="flex items-center justify-between mt-auto">
-                            <div className="flex -space-x-2">
-                               {/* Abstract Avatars icon */}
-                               <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border-2 border-white dark:border-slate-900 text-[10px] text-slate-500">
-                                  <i className="fas fa-user"></i>
-                               </div>
-                            </div>
-                            {/* Citation Count Display (Fake Views) */}
-                            <div className="flex gap-3">
-                              {(paper.citationCount || 0) > 0 && (
-                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                                  <i className="fas fa-quote-right text-[10px]"></i> {paper.citationCount} Cited
-                                </span>
-                              )}
-                              <span className="text-xs font-bold text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                                 Score: {paper.relevanceScore}
-                              </span>
-                            </div>
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </div>
-          )}
-
-          {/* Results Info & Pagination Controls (Top) */}
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-             <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-               Showing <span className="font-bold text-slate-900 dark:text-white">{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> - <span className="font-bold text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-bold text-slate-900 dark:text-white">{totalItems}</span> results
-             </span>
-             
-             <div className="flex items-center gap-3">
-               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Show:</span>
-               <select 
-                 value={itemsPerPage}
-                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200"
-               >
-                 <option value={10}>10 per page</option>
-                 <option value={30}>30 per page</option>
-                 <option value={50}>50 per page</option>
-                 <option value={100}>100 per page</option>
-               </select>
-             </div>
-          </div>
-
           {/* Papers Grid/List */}
           {isScanning ? (
             <div className={`gap-6 ${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col'}`}>
-              {Array.from({ length: itemsPerPage }).map((_, i) => (
+              {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 animate-pulse shadow-sm ${viewMode === 'list' ? 'h-24' : ''}`}>
                   <div className="flex justify-between mb-4">
                     <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-1/4"></div>
@@ -544,44 +374,17 @@ const App: React.FC = () => {
           ) : (
             viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-                {paginatedPapers.map((paper) => (
+                {processedPapers.map((paper) => (
                   <PaperCard key={paper.id} paper={paper} />
                 ))}
               </div>
             ) : (
                <div className="flex flex-col gap-3 animate-fade-in">
-                 {paginatedPapers.map((paper) => (
+                 {processedPapers.map((paper) => (
                    <PaperListItem key={paper.id} paper={paper} />
                  ))}
                </div>
             )
-          )}
-
-          {/* Pagination Controls (Bottom) */}
-          {!isScanning && totalItems > itemsPerPage && (
-            <div className="flex justify-center items-center gap-4 mt-12 mb-8">
-              <button 
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                <i className="fas fa-chevron-left text-xs"></i> Previous
-              </button>
-              
-              <div className="flex items-center gap-2">
-                 <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                    Page <span className="font-bold text-slate-900 dark:text-white">{currentPage}</span> of <span className="font-bold">{totalPages}</span>
-                 </span>
-              </div>
-
-              <button 
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                Next <i className="fas fa-chevron-right text-xs"></i>
-              </button>
-            </div>
           )}
 
           {/* Empty State */}

@@ -9,7 +9,6 @@ export interface ResearchPaper {
   url: string;
   tags: string[];
   relevanceScore: number;
-  citationCount?: number; // New field for trending logic
 }
 
 export interface ScannerState {
