@@ -12,7 +12,8 @@ const getSourceColor = (source: string) => {
   if (s.includes('arxiv')) return 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30';
   if (s.includes('ssrn')) return 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30';
   if (s.includes('nber')) return 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30';
-  if (s.includes('jf') || s.includes('jfe') || s.includes('rfs') || s.includes('journal')) 
+  if (s.includes('researchgate')) return 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-900/30';
+  if (s.includes('jf') || s.includes('jfe') || s.includes('rfs') || s.includes('journal') || s.includes('elsevier') || s.includes('sciencedirect') || s.includes('banking and finance')) 
     return 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/30';
   if (s.includes('cfa') || s.includes('bis') || s.includes('fed') || s.includes('bls') || s.includes('labor')) 
     return 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30';
@@ -27,13 +28,12 @@ const PaperListItem: React.FC<PaperListItemProps> = ({ paper }) => {
     <>
       <div 
         onClick={() => setIsModalOpen(true)}
-        className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 flex flex-col md:flex-row md:items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50"
+        className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 flex flex-col md:flex-row md:items-start gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50"
       >
         {/* Left: Source & Date */}
-        {/* Changed layout: Stack vertically on desktop (md:flex-col) to handle long source names gracefully */}
         <div className="flex flex-row md:flex-col items-center md:items-start gap-3 md:gap-1.5 w-full md:w-40 shrink-0">
           <span 
-            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md leading-tight line-clamp-2 text-ellipsis overflow-hidden max-w-full ${getSourceColor(paper.source)}`}
+            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md leading-tight line-clamp-2 text-ellipsis overflow-hidden text-left ${getSourceColor(paper.source)}`}
             title={paper.source}
           >
             {paper.source}
@@ -45,7 +45,7 @@ const PaperListItem: React.FC<PaperListItemProps> = ({ paper }) => {
 
         {/* Middle: Content */}
         <div className="flex-grow min-w-0 mr-4">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {paper.title}
           </h3>
           <div className="flex items-center gap-3 mt-1.5">

@@ -6,161 +6,125 @@ interface Message {
   name: string;
   text: string;
   date: string;
-  likes: number;
 }
 
-export const MessageBoard: React.FC = () => {
+const MessageBoard: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newName, setNewName] = useState('');
-  const [newText, setNewText] = useState('');
+  const [name, setName] = useState('');
+  const [text, setText] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Load from local storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('quantscan_messages');
-    if (saved) {
-      try {
-          setMessages(JSON.parse(saved));
-      } catch (e) {
-          console.error("Failed to parse messages", e);
-      }
+    const stored = localStorage.getItem('quantscan_messages');
+    if (stored) {
+      setMessages(JSON.parse(stored));
     } else {
-        // Seed some initial data if empty
-        const initialMessages = [
-            { 
-              id: '1', 
-              name: 'Dr. Alpha', 
-              text: 'The momentum factor seems to be decaying in recent crypto markets. Has anyone seen good papers on this?', 
-              date: new Date(Date.now() - 86400000 * 2).toLocaleDateString(), 
-              likes: 12 
-            },
-            { 
-              id: '2', 
-              name: 'QuantDev', 
-              text: 'Found a great paper on Transformer models for limit order books on arXiv today!', 
-              date: new Date(Date.now() - 86400000).toLocaleDateString(), 
-              likes: 5 
-            }
-        ];
-        setMessages(initialMessages);
-        localStorage.setItem('quantscan_messages', JSON.stringify(initialMessages));
+      // Default mock messages for first-time users
+      setMessages([
+        {
+          id: '1',
+          name: 'ResearchBot',
+          text: 'Welcome to the community board! Feel free to leave feedback or discuss the latest alpha.',
+          date: new Date().toLocaleDateString()
+        }
+      ]);
     }
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newText.trim()) return;
+    if (!name.trim() || !text.trim()) return;
 
-    const msg: Message = {
+    const newMessage: Message = {
       id: Date.now().toString(),
-      name: newName,
-      text: newText,
-      date: new Date().toLocaleDateString(),
-      likes: 0
+      name: name.trim(),
+      text: text.trim(),
+      date: new Date().toLocaleDateString()
     };
 
-    const updated = [msg, ...messages];
-    setMessages(updated);
-    localStorage.setItem('quantscan_messages', JSON.stringify(updated));
-    setNewName('');
-    setNewText('');
-  };
-
-  const handleLike = (id: string) => {
-    const updated = messages.map(m => m.id === id ? { ...m, likes: m.likes + 1 } : m);
-    setMessages(updated);
-    localStorage.setItem('quantscan_messages', JSON.stringify(updated));
+    const updatedMessages = [newMessage, ...messages];
+    setMessages(updatedMessages);
+    localStorage.setItem('quantscan_messages', JSON.stringify(updatedMessages));
+    
+    setText('');
+    // Keep name populated for convenience
   };
 
   return (
-    <section className="mt-20 border-t border-slate-200 dark:border-slate-800 pt-12">
-      <div className="flex flex-col md:flex-row gap-12">
+    <div className="mt-16 max-w-2xl mx-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
         
-        {/* Input Column */}
-        <div className="md:w-1/3 space-y-6">
-          <div>
-             <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                <i className="fas fa-comments text-blue-600"></i>
-                Community Board
-             </h2>
-             <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
-                Share your thoughts, ask for papers, or discuss strategies. 
-                <span className="opacity-60 block mt-1 text-xs">(Stored locally in your browser)</span>
-             </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-             <div className="space-y-4">
-               <div>
-                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Name / Handle</label>
-                 <input 
-                   required
-                   maxLength={20}
-                   type="text"
-                   value={newName}
-                   onChange={(e) => setNewName(e.target.value)}
-                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white"
-                   placeholder="QuantAnalyst"
-                 />
-               </div>
-               <div>
-                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Message</label>
-                 <textarea 
-                   required
-                   maxLength={280}
-                   rows={3}
-                   value={newText}
-                   onChange={(e) => setNewText(e.target.value)}
-                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:text-white resize-none"
-                   placeholder="Any good papers on..."
-                 />
-               </div>
-               <button 
-                type="submit"
-                className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold py-2.5 rounded-xl hover:opacity-90 transition-opacity text-sm"
-               >
-                 Post Message
-               </button>
+        {/* Header / Toggle */}
+        <div 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="p-6 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+               <i className="fas fa-comments"></i>
              </div>
-          </form>
+             <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Community Discussion</h3>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    {messages.length} comments • Leave a message
+                </p>
+             </div>
+          </div>
+          <i className={`fas fa-chevron-down text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}></i>
         </div>
 
-        {/* List Column */}
-        <div className="md:w-2/3">
-          <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-            {messages.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 text-sm italic border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                    No messages yet. Be the first to post!
-                </div>
-            ) : (
-                messages.map(msg => (
-                <div key={msg.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold uppercase">
-                                {msg.name.slice(0, 2)}
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-none">{msg.name}</h4>
-                                <span className="text-[10px] text-slate-400">{msg.date}</span>
-                            </div>
-                        </div>
+        {/* Content Area */}
+        {isExpanded && (
+          <div className="p-6 animate-fade-in">
+            {/* Input Form */}
+            <form onSubmit={handleSubmit} className="mb-8 bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+                <div className="flex flex-col gap-3">
+                    <input 
+                        type="text"
+                        placeholder="Your Name / Alias"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        maxLength={30}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <textarea 
+                        placeholder="Share your thoughts..."
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        rows={2}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                    />
+                    <div className="flex justify-end">
                         <button 
-                            onClick={() => handleLike(msg.id)}
-                            className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-pink-500 transition-colors group"
+                            type="submit"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-lg shadow-blue-500/20"
                         >
-                            <i className={`fas fa-heart ${msg.likes > 0 ? 'text-pink-500' : 'group-hover:text-pink-500'}`}></i>
-                            {msg.likes > 0 && <span>{msg.likes}</span>}
+                            Post Message
                         </button>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed pl-10">
-                        {msg.text}
-                    </p>
                 </div>
-                ))
-            )}
+            </form>
+
+            {/* Message List */}
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {messages.map((msg) => (
+                    <div key={msg.id} className="group">
+                        <div className="flex justify-between items-baseline mb-1">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">{msg.name}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{msg.date}</span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl">
+                            {msg.text}
+                        </p>
+                    </div>
+                ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 };
+
+export default MessageBoard;

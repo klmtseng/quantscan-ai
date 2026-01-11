@@ -1,6 +1,12 @@
+
+import React from 'react';
+
 export const TOPICS = [
   { id: 'All', label: 'All Research', icon: <i className="fas fa-globe"></i> },
   { id: 'QuantFinance', label: 'Quant Finance', icon: <i className="fas fa-calculator"></i> },
+  { id: 'PortfolioManagement', label: 'Portfolio Mgmt', icon: <i className="fas fa-chart-pie"></i> },
+  { id: 'AssetAllocation', label: 'Asset Allocation', icon: <i className="fas fa-layer-group"></i> },
+  { id: 'Macroeconomics', label: 'Macroeconomics', icon: <i className="fas fa-globe-americas"></i> },
   { id: 'Momentum', label: 'Momentum', icon: <i className="fas fa-chart-line"></i> },
   { id: 'Crypto', label: 'Crypto', icon: <i className="fas fa-bitcoin-sign"></i> },
   { id: 'ML', label: 'Machine Learning', icon: <i className="fas fa-brain"></i> },
@@ -17,6 +23,10 @@ export const TOPICS = [
 export const DATA_SOURCES = [
   { id: 'arXiv', label: 'arXiv (q-fin)' },
   { id: 'SSRN', label: 'SSRN' },
+  { id: 'Elsevier', label: 'Elsevier' },
+  { id: 'ScienceDirect', label: 'ScienceDirect' },
+  { id: 'JBF', label: 'J. Banking & Finance' },
+  { id: 'ResearchGate', label: 'ResearchGate (OA)' },
   { id: 'OpenAlex', label: 'OpenAlex (Journals)' },
   { id: 'BIS', label: 'BIS' },
   { id: 'FED', label: 'Fed / FRED' },
