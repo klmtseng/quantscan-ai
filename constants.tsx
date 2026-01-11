@@ -23,6 +23,7 @@ export const TOPICS = [
 export const DATA_SOURCES = [
   { id: 'arXiv', label: 'arXiv (q-fin)' },
   { id: 'SSRN', label: 'SSRN' },
+  { id: 'NBER', label: 'NBER' },
   { id: 'Elsevier', label: 'Elsevier' },
   { id: 'ScienceDirect', label: 'ScienceDirect' },
   { id: 'JBF', label: 'J. Banking & Finance' },

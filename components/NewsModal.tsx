@@ -36,6 +36,18 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose }) => {
           </p>
           
           <div className="space-y-4">
+             {/* Today's Update 3 */}
+             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded">New Features</span>
+                    <span className="text-[10px] text-slate-400">{new Date().toLocaleDateString()}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">NBER & Weekly Highlights</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    We've added <strong>NBER Working Papers</strong> to our data sources. Additionally, check out the new <strong>Weekly Highlights</strong> section to spot the hottest papers from the last 7 days instantly.
+                </p>
+            </div>
+
              {/* Today's Update 2 */}
              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-2">
@@ -57,18 +69,6 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose }) => {
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">ScienceDirect Added</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                     We've integrated <strong>ScienceDirect</strong> into our data sources. Pagination options have also been upgraded to support up to 100 results per page.
-                </p>
-            </div>
-
-            {/* Announcement 1 */}
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">Feature</span>
-                    <span className="text-[10px] text-slate-400">v1.1.0</span>
-                </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">New Quant Finance Category</h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    We've added a dedicated "Quant Finance" topic. This is now the default view.
                 </p>
             </div>
           </div>

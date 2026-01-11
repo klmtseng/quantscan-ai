@@ -172,6 +172,73 @@ const App: React.FC = () => {
     });
   }, [papers, searchTerm, sortBy]);
 
+  // Derived Trending Papers: Smart Curator Logic
+  const trendingPapers = useMemo(() => {
+     // Helper to get papers within N days
+     const getPapersWithinDays = (days: number) => {
+        const dateLimit = new Date();
+        dateLimit.setDate(dateLimit.getDate() - days);
+        const dateStr = dateLimit.toISOString().split('T')[0];
+        return papers.filter(p => p.date >= dateStr);
+     };
+
+     // 1. Try finding papers from the last 7 days
+     let pool = getPapersWithinDays(7);
+     let label = "Trending this Week";
+
+     // 2. Fallback: If less than 3 papers, extend to 30 days
+     if (pool.length < 3) {
+        pool = getPapersWithinDays(30);
+        label = "Trending this Month";
+     }
+     
+     // 3. Fallback: If still less than 3, just use all papers
+     if (pool.length < 3) {
+        pool = [...papers];
+        label = "Top Rated";
+     }
+
+     // 4. Sort by Impact Score (Relevance + Citation Boost)
+     // We weigh citations heavily because they are the user's proxy for "Views/Popularity"
+     const sorted = pool.sort((a, b) => {
+        const scoreA = a.relevanceScore + ((a.citationCount || 0) * 10);
+        const scoreB = b.relevanceScore + ((b.citationCount || 0) * 10);
+        return scoreB - scoreA;
+     });
+
+     // 5. Select Top 3 with Source Diversity
+     // We try to pick the top 3, but if #2 has the same source as #1, we look for a different source if available within the top 10.
+     const finalSelection: ResearchPaper[] = [];
+     const usedSources = new Set<string>();
+
+     if (sorted.length > 0) {
+        finalSelection.push(sorted[0]);
+        usedSources.add(sorted[0].source);
+     }
+
+     // Attempt to fill spots 2 and 3 with diverse sources
+     for (let i = 1; i < sorted.length && finalSelection.length < 3; i++) {
+        const p = sorted[i];
+        // If source not used, or if we ran out of diverse options (i > 5), just add it
+        if (!usedSources.has(p.source) || i > 5) {
+           finalSelection.push(p);
+           usedSources.add(p.source);
+        }
+     }
+
+     // Fill remaining spots if diversity check skipped some
+     if (finalSelection.length < 3) {
+         for (let i = 1; i < sorted.length && finalSelection.length < 3; i++) {
+             if (!finalSelection.find(sel => sel.id === sorted[i].id)) {
+                 finalSelection.push(sorted[i]);
+             }
+         }
+     }
+
+     return { papers: finalSelection, label };
+  }, [papers]);
+
+
   // Pagination Logic
   const totalItems = processedPapers.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -377,6 +444,62 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Weekly Highlights Section - Only shows if there are trending papers */}
+          {!isScanning && trendingPapers.papers.length > 0 && (
+             <div className="mb-10 animate-fade-in">
+                <div className="flex items-center gap-3 mb-4 pl-1">
+                   <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                      <i className="fas fa-fire text-orange-600 dark:text-orange-500 text-lg"></i>
+                   </div>
+                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Weekly Highlights</h2>
+                   <span className="text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 px-2 py-0.5 rounded-md">
+                      {trendingPapers.label}
+                   </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   {trendingPapers.papers.map(paper => (
+                      <div key={`trend-${paper.id}`} className="relative bg-gradient-to-br from-white to-orange-50/30 dark:from-slate-900 dark:to-orange-900/10 border border-orange-200/50 dark:border-orange-900/30 rounded-2xl p-5 hover:shadow-lg transition-all duration-300">
+                         <div className="absolute top-4 right-4 text-orange-500/20 dark:text-orange-500/10 text-6xl font-black -z-10 pointer-events-none">
+                            <i className="fas fa-fire"></i>
+                         </div>
+                         <div className="flex justify-between items-start mb-2">
+                             <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 bg-white/80 dark:bg-black/50 px-2 py-1 rounded shadow-sm backdrop-blur-sm">
+                                {paper.source}
+                             </span>
+                             <span className="text-[10px] font-mono text-slate-400">{paper.date}</span>
+                         </div>
+                         <h3 className="font-bold text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2" title={paper.title}>
+                            {paper.title}
+                         </h3>
+                         <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
+                            {paper.abstract}
+                         </p>
+                         <div className="flex items-center justify-between mt-auto">
+                            <div className="flex -space-x-2">
+                               {/* Abstract Avatars icon */}
+                               <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border-2 border-white dark:border-slate-900 text-[10px] text-slate-500">
+                                  <i className="fas fa-user"></i>
+                               </div>
+                            </div>
+                            {/* Citation Count Display (Fake Views) */}
+                            <div className="flex gap-3">
+                              {(paper.citationCount || 0) > 0 && (
+                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                  <i className="fas fa-quote-right text-[10px]"></i> {paper.citationCount} Cited
+                                </span>
+                              )}
+                              <span className="text-xs font-bold text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                                 Score: {paper.relevanceScore}
+                              </span>
+                            </div>
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             </div>
+          )}
 
           {/* Results Info & Pagination Controls (Top) */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
