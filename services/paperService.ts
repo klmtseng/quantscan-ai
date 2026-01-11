@@ -2,7 +2,7 @@
 import { ResearchPaper } from "../types";
 
 // Helper to calculate a dynamic relevance score
-const calculateRelevance = (title: string, abstract: string, date: string, tags: string[], citations: number = 0): number => {
+const calculateRelevance = (title: string, abstract: string, date: string, tags: string[]): number => {
   let score = 65; // Base score
 
   const text = (title + " " + abstract).toLowerCase();
@@ -27,17 +27,11 @@ const calculateRelevance = (title: string, abstract: string, date: string, tags:
     // Ignore date parsing errors
   }
 
-  // 3. High Value Keywords (Standard Boost)
+  // 3. High Value Keywords (Scoring Boost)
   const highValueKeywords = [
-    'momentum', 'alpha', 'arbitrage', 
+    'momentum', 'alpha', 'arbitrage', 'neural network', 'transformer', 
     'liquidity', 'high frequency', 'microstructure', 'portfolio optimization',
     'asset pricing', 'volatility', 'predicting', 'forecasting'
-  ];
-
-  // 3b. "Viral" Keywords (Mega Boost for Hot Topics)
-  const viralKeywords = [
-    'large language model', 'llm', 'chatgpt', 'generative ai', 'transformer',
-    'reinforcement learning', 'deep learning', 'crash risk', 'bubble'
   ];
 
   highValueKeywords.forEach(k => {
@@ -45,18 +39,7 @@ const calculateRelevance = (title: string, abstract: string, date: string, tags:
     else if (text.includes(k)) score += 2; // Abstract match
   });
 
-  viralKeywords.forEach(k => {
-    if (titleText.includes(k)) score += 10; // Massive boost for viral topics
-    else if (text.includes(k)) score += 5;
-  });
-
-  // 4. Citation Boost (Impact Signal)
-  // Even 1 citation for a recent paper is significant
-  if (citations > 0) {
-      score += Math.min(15, citations * 2); 
-  }
-
-  // 5. Abstract Quality (Proxy)
+  // 4. Abstract Quality (Proxy)
   if (abstract.length > 500) score += 3;
   if (abstract.length < 50) score -= 10; // Penalty for missing/short abstract
 
@@ -86,8 +69,8 @@ const generateTags = (title: string, abstract: string): string[] => {
   if (text.includes('carry')) tags.add('Carry');
   
   // Methodology & Technology
-  if (text.includes('machine learning') || text.includes('neural network') || text.includes('deep learning') || text.includes('reinforcement learning') || text.includes('lstm') || text.includes('transformer') || text.includes('llm') || text.includes('generative')) tags.add('ML/AI');
-  if (text.includes('nlp') || text.includes('sentiment') || text.includes('textual') || text.includes('language model')) tags.add('NLP');
+  if (text.includes('machine learning') || text.includes('neural network') || text.includes('deep learning') || text.includes('reinforcement learning') || text.includes('lstm') || text.includes('transformer')) tags.add('ML/AI');
+  if (text.includes('nlp') || text.includes('sentiment') || text.includes('textual') || text.includes('llm') || text.includes('language model')) tags.add('NLP');
   if (text.includes('high frequency') || text.includes('hft') || text.includes('microstructure') || text.includes('order book') || text.includes('limit order')) tags.add('HFT');
   if (text.includes('statistical') || text.includes('econometric')) tags.add('Stats');
 
@@ -104,10 +87,6 @@ const generateTags = (title: string, abstract: string): string[] => {
   if (text.includes('transfer pricing')) tags.add('Transfer Pricing');
   if (text.includes('supply chain') || text.includes('value chain')) tags.add('Value Chain');
   if (text.includes('labor') || text.includes('employment') || text.includes('wage')) tags.add('Labor');
-
-  // New Topics Tagging
-  if (text.includes('portfolio management') || text.includes('wealth management')) tags.add('Portfolio Mgmt');
-  if (text.includes('asset allocation') || text.includes('rebalancing')) tags.add('Asset Allocation');
 
   // Default fallback if really nothing matches
   if (tags.size === 0) {
@@ -137,11 +116,8 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
     const tags = generateTags(title, summary);
     if (tags.length === 0) tags.push("Pre-print");
     
-    // arXiv doesn't provide citation counts in the free API
-    const citations = 0;
-    
     // Calculate Score
-    const score = calculateRelevance(title, summary, published.split("T")[0], tags, citations);
+    const score = calculateRelevance(title, summary, published.split("T")[0], tags);
 
     return {
       id,
@@ -152,8 +128,7 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
       source: "arXiv (q-fin)",
       url: link,
       tags: tags,
-      relevanceScore: score,
-      citationCount: 0
+      relevanceScore: score
     };
   });
 };
@@ -191,12 +166,6 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
     if (defaultSourceLabel === "BIS" && !sourceName.toLowerCase().includes('bis')) sourceName = "BIS Working Papers";
     if (defaultSourceLabel === "Federal Reserve" && !sourceName.toLowerCase().includes('federal reserve')) sourceName = "Federal Reserve";
     if (defaultSourceLabel === "BLS" && !sourceName.toLowerCase().includes('labor statistics')) sourceName = "BLS";
-    if (defaultSourceLabel === "NBER" && !sourceName.toLowerCase().includes('nber')) sourceName = "NBER Working Papers";
-    
-    // For ResearchGate proxy, if the real source is not useful or is generic, stick to the default label
-    if (defaultSourceLabel === "ResearchGate (OA)" && (!sourceName || sourceName === "OpenAlex")) {
-        sourceName = "ResearchGate (OA)";
-    }
 
     // Handle missing authors with safe chaining
     const authors = work.authorships && work.authorships.length > 0
@@ -211,11 +180,8 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
     const tags = generateTags(work.title, abstract);
     if (tags.length === 0) tags.push("Research");
     
-    // Extract Citation Count
-    const citations = work.cited_by_count || 0;
-
     // Calculate Score
-    const score = calculateRelevance(work.title, abstract, work.publication_date, tags, citations);
+    const score = calculateRelevance(work.title, abstract, work.publication_date, tags);
 
     return {
       id: work.id,
@@ -226,8 +192,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
       source: sourceName || "OpenAlex",
       url: work.doi || work.primary_location?.landing_page_url || "",
       tags: tags,
-      relevanceScore: score,
-      citationCount: citations
+      relevanceScore: score
     };
   });
 };
@@ -278,9 +243,6 @@ export class PaperService {
     switch(topic) {
         case 'All': baseQuery = ""; break;
         case 'QuantFinance': baseQuery = "quantitative finance empirical asset pricing"; break;
-        case 'PortfolioManagement': baseQuery = "portfolio management optimization construction asset allocation"; break;
-        case 'AssetAllocation': baseQuery = "asset allocation strategic tactical portfolio"; break;
-        case 'Macroeconomics': baseQuery = "macroeconomics inflation monetary policy GDP"; break;
         case 'Momentum': baseQuery = "momentum strategy asset pricing"; break;
         case 'Crypto': baseQuery = "cryptocurrency bitcoin defi"; break;
         case 'ML': baseQuery = "machine learning finance neural networks"; break;
@@ -325,7 +287,7 @@ export class PaperService {
          q = `all:${encodeURIComponent(queryTerm)}+AND+cat:q-fin.*`;
       }
       
-      const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=100`;
+      const arxivUrl = `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=30`;
       
       // Use a CORS proxy (corsproxy.io) to bypass browser restrictions
       // allorigins.win can be unstable, so we use corsproxy.io
@@ -352,7 +314,7 @@ export class PaperService {
          filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        }
 
-       const ssrnUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
+       const ssrnUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
 
        promises.push(
         fetch(ssrnUrl)
@@ -365,112 +327,14 @@ export class PaperService {
        );
     }
 
-    // 5. Fetch from Elsevier / ScienceDirect (via OpenAlex)
-    // ScienceDirect is the platform, Elsevier is the publisher. We combine them to efficienty fetch from OpenAlex.
-    if (useAllSources || sources.includes('Elsevier') || sources.includes('ScienceDirect')) {
-        let effectiveQuery = queryTerm;
-        if (!effectiveQuery) effectiveQuery = "finance economics";
- 
-        let filter = `primary_location.source.publisher:Elsevier,from_publication_date:${fromDate}`;
-        
-        if (effectiveQuery) {
-           filter = `default.search:${encodeURIComponent(effectiveQuery)},${filter}`;
-        }
- 
-        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
- 
-        promises.push(
-         fetch(url)
-           .then(res => res.json())
-           .then(data => parseOpenAlexJSON(data, "Elsevier"))
-           .catch(err => {
-              console.error("Elsevier/ScienceDirect fetch error", err);
-              return [];
-           })
-        );
-     }
-
-    // Fetch from Journal of Banking and Finance
-    if (useAllSources || sources.includes('JBF')) {
-        let effectiveQuery = queryTerm;
-        // If queryTerm is empty, we don't strictly need "finance" because the journal itself is niche.
-        
-        let filter = `primary_location.source.display_name:Journal%20of%20Banking%20and%20Finance,from_publication_date:${fromDate}`;
-        
-        if (effectiveQuery) {
-           filter = `default.search:${encodeURIComponent(effectiveQuery)},${filter}`;
-        }
- 
-        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
- 
-        promises.push(
-         fetch(url)
-           .then(res => res.json())
-           .then(data => parseOpenAlexJSON(data, "J. Banking & Finance"))
-           .catch(err => {
-              console.error("JBF fetch error", err);
-              return [];
-           })
-        );
-    }
-
-    // Fetch from NBER (National Bureau of Economic Research)
-    if (useAllSources || sources.includes('NBER')) {
-        let effectiveQuery = queryTerm;
-        let filter = `institutions.search:National%20Bureau%20of%20Economic%20Research,from_publication_date:${fromDate}`;
-        
-        if (effectiveQuery) {
-           filter = `default.search:${encodeURIComponent(effectiveQuery)},${filter}`;
-        }
- 
-        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
- 
-        promises.push(
-         fetch(url)
-           .then(res => res.json())
-           .then(data => parseOpenAlexJSON(data, "NBER"))
-           .catch(err => {
-              console.error("NBER fetch error", err);
-              return [];
-           })
-        );
-    }
-
-    // 6. Fetch from ResearchGate Proxy (via OpenAlex OA)
-    // ResearchGate doesn't have a public API. We proxy "ResearchGate" intent by finding Open Access articles
-    // which are typically what RG provides.
-    if (useAllSources || sources.includes('ResearchGate')) {
-        let effectiveQuery = queryTerm;
-        if (!effectiveQuery) effectiveQuery = "finance economics";
- 
-        // We filter for Type:Article and IS_OA:true to simulate ResearchGate's value prop (accessible papers)
-        let filter = `is_oa:true,type:article,from_publication_date:${fromDate}`;
-        
-        if (effectiveQuery) {
-           filter = `default.search:${encodeURIComponent(effectiveQuery)},${filter}`;
-        }
- 
-        const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
- 
-        promises.push(
-         fetch(url)
-           .then(res => res.json())
-           .then(data => parseOpenAlexJSON(data, "ResearchGate (OA)"))
-           .catch(err => {
-              console.error("ResearchGate proxy fetch error", err);
-              return [];
-           })
-        );
-     }
-
-    // 7. Fetch BIS (Bank for International Settlements)
+    // 5. Fetch BIS (Bank for International Settlements)
     if (useAllSources || sources.includes('BIS')) {
        let filter = `institutions.search:Bank%20for%20International%20Settlements,from_publication_date:${fromDate}`;
        if (queryTerm) {
           filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        }
        
-       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
         fetch(url)
           .then(res => res.json())
@@ -482,14 +346,14 @@ export class PaperService {
        );
     }
 
-    // 8. Fetch Federal Reserve (FED)
+    // 6. Fetch Federal Reserve (FED)
     if (useAllSources || sources.includes('FED')) {
        let filter = `institutions.search:Federal%20Reserve,from_publication_date:${fromDate}`;
        if (queryTerm) {
           filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        }
 
-       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
         fetch(url)
           .then(res => res.json())
@@ -501,14 +365,14 @@ export class PaperService {
        );
     }
 
-    // 9. Fetch BLS (Bureau of Labor Statistics)
+    // 7. Fetch BLS (Bureau of Labor Statistics)
     if (useAllSources || sources.includes('BLS')) {
        let filter = `institutions.search:Bureau%20of%20Labor%20Statistics,from_publication_date:${fromDate}`;
        if (queryTerm) {
           filter = `default.search:${encodeURIComponent(queryTerm)},${filter}`;
        }
 
-       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
+       const url = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
        promises.push(
         fetch(url)
           .then(res => res.json())
@@ -520,7 +384,7 @@ export class PaperService {
        );
     }
 
-    // 10. Fetch from OpenAlex (General Journals)
+    // 8. Fetch from OpenAlex (General Journals)
     if (useAllSources || sources.includes('OpenAlex')) {
        // For general bucket, "All" needs to be bounded to domain to avoid unrelated sciences.
        // If baseQuery is empty (Topic=All) and NO search term, fallback to "finance economics"
@@ -529,7 +393,7 @@ export class PaperService {
 
        const filter = `default.search:${encodeURIComponent(effectiveQuery)},from_publication_date:${fromDate}`;
        
-       const openAlexUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=100`;
+       const openAlexUrl = `https://api.openalex.org/works?filter=${filter}&sort=publication_date:desc&per_page=30`;
 
        promises.push(
         fetch(openAlexUrl)
@@ -542,7 +406,7 @@ export class PaperService {
        );
     }
 
-    // 11. Aggregate and Sort
+    // 9. Aggregate and Sort
     const results = await Promise.all(promises);
     let allPapers = results.flat();
 
