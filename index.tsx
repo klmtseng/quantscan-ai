@@ -11,7 +11,7 @@ import NewsModal from './components/NewsModal';
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
-import {MessageBoard } from './components/MessageBoard';
+import MessageBoard from './components/MessageBoard';
 
 const App: React.FC = () => {
   // Papers state now holds the fetched data
@@ -31,6 +31,10 @@ const App: React.FC = () => {
     start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   const [isScanning, setIsScanning] = useState(false);
   const [visitCount, setVisitCount] = useState<number>(0);
@@ -63,6 +67,11 @@ const App: React.FC = () => {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTopic, datePreset, selectedSources, customRange, searchTerm, itemsPerPage, sortBy]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -162,6 +171,22 @@ const App: React.FC = () => {
       return 0;
     });
   }, [papers, searchTerm, sortBy]);
+
+  // Pagination Logic
+  const totalItems = processedPapers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  
+  const paginatedPapers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return processedPapers.slice(startIndex, startIndex + itemsPerPage);
+  }, [processedPapers, currentPage, itemsPerPage]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const handleDateSortToggle = () => {
     if (sortBy === 'newest') {
@@ -353,10 +378,31 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Results Info & Pagination Controls (Top) */}
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+             <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+               Showing <span className="font-bold text-slate-900 dark:text-white">{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> - <span className="font-bold text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-bold text-slate-900 dark:text-white">{totalItems}</span> results
+             </span>
+             
+             <div className="flex items-center gap-3">
+               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Show:</span>
+               <select 
+                 value={itemsPerPage}
+                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200"
+               >
+                 <option value={10}>10 per page</option>
+                 <option value={30}>30 per page</option>
+                 <option value={50}>50 per page</option>
+                 <option value={100}>100 per page</option>
+               </select>
+             </div>
+          </div>
+
           {/* Papers Grid/List */}
           {isScanning ? (
             <div className={`gap-6 ${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col'}`}>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+              {Array.from({ length: itemsPerPage }).map((_, i) => (
                 <div key={i} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 animate-pulse shadow-sm ${viewMode === 'list' ? 'h-24' : ''}`}>
                   <div className="flex justify-between mb-4">
                     <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-1/4"></div>
@@ -375,17 +421,44 @@ const App: React.FC = () => {
           ) : (
             viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-                {processedPapers.map((paper) => (
+                {paginatedPapers.map((paper) => (
                   <PaperCard key={paper.id} paper={paper} />
                 ))}
               </div>
             ) : (
                <div className="flex flex-col gap-3 animate-fade-in">
-                 {processedPapers.map((paper) => (
+                 {paginatedPapers.map((paper) => (
                    <PaperListItem key={paper.id} paper={paper} />
                  ))}
                </div>
             )
+          )}
+
+          {/* Pagination Controls (Bottom) */}
+          {!isScanning && totalItems > itemsPerPage && (
+            <div className="flex justify-center items-center gap-4 mt-12 mb-8">
+              <button 
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                <i className="fas fa-chevron-left text-xs"></i> Previous
+              </button>
+              
+              <div className="flex items-center gap-2">
+                 <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                    Page <span className="font-bold text-slate-900 dark:text-white">{currentPage}</span> of <span className="font-bold">{totalPages}</span>
+                 </span>
+              </div>
+
+              <button 
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                Next <i className="fas fa-chevron-right text-xs"></i>
+              </button>
+            </div>
           )}
 
           {/* Empty State */}

@@ -36,6 +36,30 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose }) => {
           </p>
           
           <div className="space-y-4">
+             {/* Today's Update 2 */}
+             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded">New Journal</span>
+                    <span className="text-[10px] text-slate-400">{new Date().toLocaleDateString()}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Journal of Banking and Finance</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    We've added specific filtering for the <strong>Journal of Banking and Finance</strong>. You can now track papers specifically from this leading publication.
+                </p>
+            </div>
+
+             {/* Today's Update 1 */}
+             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded">New Source</span>
+                    <span className="text-[10px] text-slate-400">{new Date().toLocaleDateString()}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">ScienceDirect Added</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    We've integrated <strong>ScienceDirect</strong> into our data sources. Pagination options have also been upgraded to support up to 100 results per page.
+                </p>
+            </div>
+
             {/* Announcement 1 */}
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-2">
@@ -44,19 +68,7 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">New Quant Finance Category</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    We've added a dedicated "Quant Finance" topic. This is now the default view, filtering specifically for empirical asset pricing and quantitative strategy papers.
-                </p>
-            </div>
-
-             {/* Announcement 2 */}
-             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">Data</span>
-                    <span className="text-[10px] text-slate-400">Sources</span>
-                </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Expanded Source Coverage</h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                    Our scanner now connects directly to the arXiv (q-fin) API and aggregates working papers from the BIS and Federal Reserve via OpenAlex.
+                    We've added a dedicated "Quant Finance" topic. This is now the default view.
                 </p>
             </div>
           </div>
