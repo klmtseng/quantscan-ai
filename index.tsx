@@ -8,9 +8,11 @@ import PaperListItem from './components/PaperListItem';
 import ContactModal from './components/ContactModal';
 import NewsModal from './components/NewsModal';
 import TrendingSection from './components/TrendingSection';
+import ErrorBoundary from './components/ErrorBoundary';
 import { paperService } from './services/paperService';
 import { ResearchPaper, ResearchTopic, DateFilterPreset, DateRange, SortOption } from './types';
 import { TOPICS, DATE_PRESETS, DATA_SOURCES } from './constants';
+import { config } from './config';
 import MessageBoard from './components/MessageBoard';
 
 const App: React.FC = () => {
@@ -34,8 +36,9 @@ const App: React.FC = () => {
   });
   
   const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [visitCount, setVisitCount] = useState<number>(0);
-  
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') as 'light' | 'dark' || 'light';
@@ -88,7 +91,8 @@ const App: React.FC = () => {
   const performScan = async () => {
     if (isScanning) return;
     setIsScanning(true);
-    
+    setScanError(null);
+
     try {
       const result = await paperService.scanForPapers(
         activeTopic,
@@ -97,10 +101,12 @@ const App: React.FC = () => {
         customRange,
         searchTerm // Pass searchTerm to service for global API search
       );
-      
+
       setPapers(result.papers);
     } catch (error) {
       console.error("Scan failed", error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch papers. Please try again.';
+      setScanError(errorMessage);
     } finally {
       setIsScanning(false);
     }
@@ -362,6 +368,25 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Error Message */}
+          {scanError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-3">
+                <i className="fas fa-exclamation-circle text-red-500 dark:text-red-400 mt-0.5"></i>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-red-900 dark:text-red-200 mb-1">Scan Error</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">{scanError}</p>
+                </div>
+                <button
+                  onClick={() => setScanError(null)}
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-200"
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Trending Section - displayed when data exists and not searching specifically (to keep search focused) */}
           {!isScanning && trendingPapers.length > 0 && !searchTerm && (
             <TrendingSection papers={trendingPapers} />
@@ -478,10 +503,10 @@ const App: React.FC = () => {
           </div>
         </footer>
 
-        <ContactModal 
-          isOpen={isContactOpen} 
-          onClose={() => setIsContactOpen(false)} 
-          email="aaron.jsfund@gmail.com"
+        <ContactModal
+          isOpen={isContactOpen}
+          onClose={() => setIsContactOpen(false)}
+          email={config.contactEmail}
         />
         <NewsModal 
           isOpen={isNewsOpen}
@@ -494,5 +519,9 @@ const App: React.FC = () => {
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  createRoot(rootElement).render(<App />);
+  createRoot(rootElement).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
 }

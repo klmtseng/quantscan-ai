@@ -1,5 +1,6 @@
 
 import { ResearchPaper } from "../types";
+import { OpenAlexResponse, OpenAlexWork, OpenAlexInvertedIndex, OpenAlexAuthorship } from "./openAlexTypes";
 
 // Helper to calculate a dynamic relevance score
 const calculateRelevance = (title: string, abstract: string, date: string, tags: string[]): number => {
@@ -134,11 +135,11 @@ const parseArxivXML = (text: string): ResearchPaper[] => {
 };
 
 // Helper to map OpenAlex results with strict filtering
-const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper[] => {
+const parseOpenAlexJSON = (data: OpenAlexResponse, defaultSourceLabel: string): ResearchPaper[] => {
   if (!data.results) return [];
 
   // Filter out "Ads" and non-paper content
-  const validResults = data.results.filter((work: any) => {
+  const validResults = data.results.filter((work: OpenAlexWork) => {
     // 1. Must be a valid content type
     const validTypes = ['article', 'preprint', 'report', 'dissertation'];
     if (!validTypes.includes(work.type)) return false;
@@ -157,7 +158,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
     return true;
   });
 
-  return validResults.map((work: any) => {
+  return validResults.map((work: OpenAlexWork) => {
     let sourceName = work.primary_location?.source?.display_name || defaultSourceLabel;
     
     // Normalize source names for UI cleanliness
@@ -173,7 +174,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
 
     // Handle missing authors with safe chaining
     const authors = work.authorships && work.authorships.length > 0
-      ? work.authorships.map((a: any) => a.author?.display_name || "Unknown").slice(0, 3)
+      ? work.authorships.map((a: OpenAlexAuthorship) => a.author?.display_name || "Unknown").slice(0, 3)
       : ["Unknown Author"];
 
     // Handle missing abstract
@@ -202,7 +203,7 @@ const parseOpenAlexJSON = (data: any, defaultSourceLabel: string): ResearchPaper
 };
 
 // OpenAlex stores abstracts as inverted indexes to save space. We reconstruct it.
-const createAbstractFromInvertedIndex = (invertedIndex: any) => {
+const createAbstractFromInvertedIndex = (invertedIndex: OpenAlexInvertedIndex): string => {
   if (!invertedIndex) return "";
   const words: string[] = [];
   Object.keys(invertedIndex).forEach((word) => {

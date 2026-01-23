@@ -18,8 +18,26 @@ const MessageBoard: React.FC = () => {
   useEffect(() => {
     const stored = localStorage.getItem('quantscan_messages');
     if (stored) {
-      setMessages(JSON.parse(stored));
+      try {
+        const parsed = JSON.parse(stored);
+        // Validate the parsed data is an array
+        if (Array.isArray(parsed)) {
+          setMessages(parsed);
+        } else {
+          console.warn('Invalid message data in localStorage, resetting to default');
+          localStorage.removeItem('quantscan_messages');
+          setDefaultMessages();
+        }
+      } catch (error) {
+        console.error('Failed to parse messages from localStorage:', error);
+        localStorage.removeItem('quantscan_messages');
+        setDefaultMessages();
+      }
     } else {
+      setDefaultMessages();
+    }
+
+    function setDefaultMessages() {
       // Default mock messages for first-time users
       setMessages([
         {
