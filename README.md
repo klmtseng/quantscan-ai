@@ -9,6 +9,7 @@ QuantScan is a modern, responsive web application designed for quantitative fina
 
 - **Topic Filtering**: Specialized categories for Momentum, Crypto, ML, HFT, Risk, and Fixed Income.
 - **Smart Sorting**: Sort papers by Relevance or Publication Date (Newest/Oldest).
+- **Hybrid Search Ranking**: Search results under Relevance now use a weighted score (60% text match, 30% domain relevance, 10% recency) for better ranking quality across sources.
 - **Date Filtering**: Preset filters (Week, Month, Quarter) and custom date ranges.
 - **Dark Mode**: Fully responsive dark/light theme toggle.
 - **Modern UI**: Built with Tailwind CSS and React for a clean, glassmorphic aesthetic.

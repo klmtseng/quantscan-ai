@@ -124,10 +124,35 @@ const App: React.FC = () => {
   }, [activeTopic, datePreset, selectedSources, customRange.start, customRange.end]);
 
 
-  // Client-side filtering and sorting for search terms and sort order
-  // This runs on the *fetched* papers
+  const getRecencyScore = (date: string): number => {
+    const publishedAt = new Date(date).getTime();
+    if (Number.isNaN(publishedAt)) return 0;
+
+    const daysOld = (Date.now() - publishedAt) / (1000 * 60 * 60 * 24);
+    if (daysOld <= 7) return 1;
+    if (daysOld <= 30) return 0.85;
+    if (daysOld <= 90) return 0.65;
+    if (daysOld <= 180) return 0.45;
+    if (daysOld <= 365) return 0.25;
+    return 0.1;
+  };
+
+  const getHybridSearchRank = (fuseScore: number | undefined, paper: ResearchPaper): number => {
+    // Fuse score: lower is better; convert to a 0~1 "higher is better" value.
+    const textScore = 1 - Math.min(Math.max(fuseScore ?? 0.5, 0), 1);
+    const relevanceScore = Math.min(Math.max(paper.relevanceScore / 100, 0), 1);
+    const recencyScore = getRecencyScore(paper.date);
+
+    // Hybrid ranking formula (can be tuned later):
+    // 60% text relevance + 30% domain relevance + 10% recency.
+    return (textScore * 0.6) + (relevanceScore * 0.3) + (recencyScore * 0.1);
+  };
+
+  // Client-side filtering and sorting for search terms and sort order.
+  // This runs on the fetched papers.
   const processedPapers = useMemo(() => {
     let results = [...papers];
+    let hybridSearchRanks: Map<string, number> = new Map();
 
     // 1. Text Search (Fuzzy)
     // We keep client-side Fuse.js even if we searched via API, 
@@ -147,6 +172,12 @@ const App: React.FC = () => {
       });
       
       const fuseResults = fuse.search(searchTerm);
+      hybridSearchRanks = new Map(
+        fuseResults.map(result => {
+          const rank = getHybridSearchRank(result.score, result.item);
+          return [result.item.id, rank];
+        })
+      );
       results = fuseResults.map(result => result.item);
     }
 
@@ -157,7 +188,11 @@ const App: React.FC = () => {
       } else if (sortBy === 'oldest') {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       } else if (sortBy === 'relevance') {
-        if (searchTerm.trim()) return 0; // Keep fuse ranking if searching
+        if (searchTerm.trim()) {
+          const hybridA = hybridSearchRanks.get(a.id) ?? 0;
+          const hybridB = hybridSearchRanks.get(b.id) ?? 0;
+          return hybridB - hybridA;
+        }
         return b.relevanceScore - a.relevanceScore;
       }
       return 0;
