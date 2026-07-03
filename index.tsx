@@ -509,6 +509,11 @@ const App: React.FC = () => {
                 Supporting Open Science & Quantitative Asset Pricing globally. <br/>
                 A platform for Momentum and Crypto researchers.
               </p>
+              <p className="mt-4 text-[10px] leading-relaxed opacity-50 max-w-2xl mx-auto normal-case tracking-normal">
+                Personal research/educational project. Not investment advice; no solicitation or
+                recommendation of any security. Any figures are illustrative and hypothetical; past or
+                backtested results do not indicate future performance.
+              </p>
             </div>
           </div>
         </footer>
