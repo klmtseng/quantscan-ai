@@ -47,3 +47,7 @@ QuantScan is a modern, responsive web application designed for quantitative fina
 ## License
 
 MIT
+
+---
+
+*Disclaimer: personal research/educational project. Not investment advice; no solicitation or recommendation of any security. Any figures are illustrative and hypothetical; past or backtested results do not indicate future performance.*
